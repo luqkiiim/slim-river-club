@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  min-height: 100%;
+}
+
+body {
+  min-height: 100vh;
+  background-color: #fffdf8;
+  color: #1f2a1f;
+}
+
+::selection {
+  background: rgba(232, 143, 116, 0.28);
+}
+
+@layer base {
+  body {
+    @apply bg-hero-glow font-sans antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply tracking-tight text-ink;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply rounded-[28px] border border-black/5 bg-cream/90 shadow-panel backdrop-blur;
+  }
+
+  .panel-muted {
+    @apply rounded-[24px] border border-black/5 bg-white/70;
+  }
+
+  .field {
+    @apply w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm text-ink outline-none transition focus:border-leaf focus:ring-2 focus:ring-leaf/20;
+  }
+
+  .primary-button {
+    @apply inline-flex items-center justify-center rounded-full bg-moss px-5 py-3 text-sm font-semibold text-white transition hover:bg-ink disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .secondary-button {
+    @apply inline-flex items-center justify-center rounded-full border border-black/10 bg-white px-5 py-3 text-sm font-semibold text-ink transition hover:border-moss hover:text-moss disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .status-chip {
+    @apply inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em];
+  }
+}

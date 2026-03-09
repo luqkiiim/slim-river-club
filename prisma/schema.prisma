@@ -1,0 +1,79 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id                  String          @id @default(cuid())
+  name                String
+  email               String?         @unique
+  passwordHash        String?
+  claimCode           String?         @unique
+  isPrivate           Boolean         @default(false)
+  heightCm            Float?
+  startWeight         Float?
+  targetWeight        Float?
+  targetLossKg        Float?
+  monthlyLossTargetKg Float           @default(2)
+  monthlyPenaltyRm    Int             @default(30)
+  challengeStartDate  DateTime?
+  goalReached         Boolean         @default(false)
+  isAdmin             Boolean         @default(false)
+  isParticipant       Boolean         @default(true)
+  totalRmOwed         Int             @default(0)
+  createdAt           DateTime        @default(now())
+  weightEntries       WeightEntry[]
+  monthlyResults      MonthlyResult[]
+}
+
+model MonthPolicy {
+  id                String   @id @default(cuid())
+  month             Int
+  year              Int
+  requiredTargetPct Int      @default(100)
+  createdAt         DateTime @default(now())
+
+  @@unique([month, year], name: "month_year")
+  @@index([year, month])
+}
+
+model WeightEntry {
+  id        String          @id @default(cuid())
+  userId    String
+  entryType WeightEntryType @default(ABSOLUTE)
+  weight    Float?
+  lossKg    Float?
+  date      DateTime
+  createdAt DateTime        @default(now())
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+}
+
+model MonthlyResult {
+  id              String  @id @default(cuid())
+  userId          String
+  month           Int
+  year            Int
+  startWeight     Float?
+  endWeight       Float?
+  weightLoss      Float
+  requiredLossKg  Float    @default(0)
+  targetRatioPct  Int      @default(100)
+  penaltyApplied  Boolean
+  penaltyExempt   Boolean @default(false)
+  penaltyAmountRm Int     @default(0)
+  user            User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, month, year], name: "userId_month_year")
+  @@index([year, month])
+}
+
+enum WeightEntryType {
+  ABSOLUTE
+  LOSS_DELTA
+}
