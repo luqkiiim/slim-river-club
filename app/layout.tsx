@@ -17,6 +17,15 @@ const monoFont = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "Slim River Club",
   description: "Mobile-friendly office weight loss tracker with per-participant monthly targets and penalty rules.",
+  applicationName: "Slim River Club",
+  icons: {
+    apple: [{ url: "/apple-icon.png" }],
+  },
+  appleWebApp: {
+    capable: true,
+    title: "Slim River Club",
+    statusBarStyle: "default",
+  },
 };
 
 export default function RootLayout({
