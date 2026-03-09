@@ -21,7 +21,7 @@ export default async function DashboardPage() {
         <div className="space-y-3">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-moss">Dashboard</p>
           <div>
-            <h1 className="text-3xl font-semibold [font-family:var(--font-heading)] sm:text-4xl">Office weight tracker</h1>
+            <h1 className="text-3xl font-semibold [font-family:var(--font-heading)] sm:text-4xl">Slim River Club</h1>
             <p className="mt-2 max-w-2xl text-sm text-ink/70">
               {session.user.isParticipant
                 ? `Welcome back, ${session.user.name}. The system automatically calculates monthly penalties using each participant's own monthly target, penalty amount, challenge start date, and any special month rules from admin.`

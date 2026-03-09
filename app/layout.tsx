@@ -15,7 +15,7 @@ const monoFont = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Office Weight Tracker",
+  title: "Slim River Club",
   description: "Mobile-friendly office weight loss tracker with per-participant monthly targets and penalty rules.",
 };
 
