@@ -76,13 +76,6 @@ export function UserCard({ user, currentMonthLabel }: UserCardProps) {
               </span>
             ) : null}
           </div>
-          <p className="mt-1 text-sm text-ink/65">
-            {user.lastLoggedAt
-              ? `Last logged ${user.lastLoggedAt}`
-              : user.displayMode === "weight"
-                ? "No weigh-ins yet"
-                : "No progress updates yet"}
-          </p>
         </div>
         <span className={`status-chip ${statusClasses(user.monthlyStatus)}`}>{user.monthlyStatus}</span>
       </div>
@@ -125,14 +118,23 @@ export function UserCard({ user, currentMonthLabel }: UserCardProps) {
         </div>
       </div>
 
-      <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-ink/65">
-          {user.displayMode === "weight" && user.targetWeight !== null
-            ? `Target is ${formatWeight(user.targetWeight)}.`
-            : user.targetLossKg !== null
-              ? `Target is ${formatWeight(user.targetLossKg)} loss.`
-              : "Target not set yet."}
-        </p>
+      <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-1">
+          <p className="text-sm text-ink/65">
+            {user.displayMode === "weight" && user.targetWeight !== null
+              ? `Target is ${formatWeight(user.targetWeight)}.`
+              : user.targetLossKg !== null
+                ? `Target is ${formatWeight(user.targetLossKg)} loss.`
+                : "Target not set yet."}
+          </p>
+          <p className="text-sm text-ink/55">
+            {user.lastLoggedAt
+              ? `Last logged ${user.lastLoggedAt}`
+              : user.displayMode === "weight"
+                ? "No weigh-ins yet"
+                : "No progress updates yet"}
+          </p>
+        </div>
         <Link className="text-sm font-semibold text-moss underline-offset-4 hover:underline" href={`/users/${user.id}`}>
           View profile
         </Link>
