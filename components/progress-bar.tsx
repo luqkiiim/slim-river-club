@@ -12,6 +12,8 @@ interface ProgressBarProps {
 }
 
 export function ProgressBar({ title, progressPct, metrics }: ProgressBarProps) {
+  const clampedProgressPct = Math.min(Math.max(progressPct, 0), 100);
+
   return (
     <div className="space-y-3">
       <div className="flex flex-col gap-1 text-sm font-medium text-ink/80 sm:flex-row sm:items-center sm:justify-between">
@@ -22,7 +24,7 @@ export function ProgressBar({ title, progressPct, metrics }: ProgressBarProps) {
       <div className="h-4 overflow-hidden rounded-full bg-sand/80">
         <div
           className="h-full rounded-full bg-[linear-gradient(90deg,_#4d8b5b_0%,_#83b58f_100%)] transition-[width]"
-          style={{ width: `${progressPct}%` }}
+          style={{ width: `${clampedProgressPct}%` }}
         />
       </div>
 

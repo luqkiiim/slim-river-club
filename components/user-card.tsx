@@ -25,30 +25,41 @@ function statusClasses(status: MonthlyStatus) {
   return "bg-blush/15 text-[#8f4a36]";
 }
 
-function buildProgressContent(user: DashboardUserSummary) {
-  if (user.displayMode === "weight" && user.startWeight !== null && user.currentWeight !== null && user.targetWeight !== null) {
-    return {
-      title: "Progress toward target",
-      metrics: [
-        { label: "Start", value: formatWeight(user.startWeight) },
-        { label: "Current", value: formatWeight(user.currentWeight) },
-        { label: "Target", value: formatWeight(user.targetWeight) },
-      ] as const,
-    };
+function getCurrentMonthProgressPct(user: DashboardUserSummary) {
+  if (user.monthlyStatus === "EXEMPT") {
+    return 100;
   }
 
+  if (user.currentMonthRequiredLossKg <= 0) {
+    return 100;
+  }
+
+  return Math.max((user.currentMonthLoss / user.currentMonthRequiredLossKg) * 100, 0);
+}
+
+function buildMonthlyProgressContent(user: DashboardUserSummary, currentMonthLabel: string) {
   return {
-    title: "Progress toward target loss",
+    title: `${currentMonthLabel} progress`,
+    progressPct: getCurrentMonthProgressPct(user),
     metrics: [
-      { label: "Mode", value: user.needsStartingWeight ? "Baseline pending" : "Private" },
-      { label: "Lost", value: formatWeight(user.kgLost) },
-      { label: "Target", value: user.targetLossKg !== null ? formatWeight(user.targetLossKg) : "Not set" },
+      {
+        label: "Lost",
+        value: user.currentMonthEntryCount > 0 ? formatWeight(user.currentMonthLoss) : "No updates yet",
+      },
+      {
+        label: "Required",
+        value: user.monthlyStatus === "EXEMPT" ? "Exempt" : formatWeight(user.currentMonthRequiredLossKg),
+      },
+      {
+        label: "Status",
+        value: user.monthlyStatus === "EXEMPT" ? "Started mid-month" : user.monthlyStatus,
+      },
     ] as const,
   };
 }
 
 export function UserCard({ user, currentMonthLabel }: UserCardProps) {
-  const progressContent = buildProgressContent(user);
+  const progressContent = buildMonthlyProgressContent(user, currentMonthLabel);
 
   return (
     <article className="panel p-5 sm:p-6">
@@ -76,7 +87,7 @@ export function UserCard({ user, currentMonthLabel }: UserCardProps) {
         <span className={`status-chip ${statusClasses(user.monthlyStatus)}`}>{user.monthlyStatus}</span>
       </div>
 
-      <ProgressBar title={progressContent.title} progressPct={user.progressPct} metrics={progressContent.metrics} />
+      <ProgressBar title={progressContent.title} progressPct={progressContent.progressPct} metrics={progressContent.metrics} />
 
       <div className="mt-5 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
         <div className="panel-muted p-3">
