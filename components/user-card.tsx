@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { ProgressBar } from "@/components/progress-bar";
-import { formatRm, formatWeight } from "@/lib/weight-utils";
+import { formatWeight } from "@/lib/weight-utils";
 import type { DashboardUserSummary, MonthlyStatus } from "@/types/app";
 
 interface UserCardProps {
@@ -89,7 +89,7 @@ export function UserCard({ user, currentMonthLabel }: UserCardProps) {
 
       <ProgressBar title={progressContent.title} progressPct={progressContent.progressPct} metrics={progressContent.metrics} />
 
-      <div className="mt-5 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+      <div className="mt-5 grid grid-cols-2 gap-3 text-sm lg:grid-cols-3">
         <div className="panel-muted p-3">
           <p className="text-xs uppercase tracking-[0.16em] text-ink/45">
             {user.displayMode === "weight" ? "Current" : "Total lost"}
@@ -108,12 +108,6 @@ export function UserCard({ user, currentMonthLabel }: UserCardProps) {
               : user.targetLossKg !== null
                 ? formatWeight(user.targetLossKg)
                 : "Not set"}
-          </p>
-        </div>
-        <div className="panel-muted p-3">
-          <p className="text-xs uppercase tracking-[0.16em] text-ink/45">RM owed</p>
-          <p className={`mt-2 font-semibold ${user.totalRmOwed > 0 ? "text-[#8f4a36]" : "text-moss"}`}>
-            {formatRm(user.totalRmOwed)}
           </p>
         </div>
         <div className="panel-muted p-3">
