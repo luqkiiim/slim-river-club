@@ -43,7 +43,7 @@ function buildMonthlyProgressContent(user: DashboardUserSummary, currentMonthLab
     progressPct: getCurrentMonthProgressPct(user),
     metrics: [
       {
-        label: "Lost",
+        label: "This month",
         value: user.currentMonthEntryCount > 0 ? formatWeight(user.currentMonthLoss) : "No updates yet",
       },
       {
@@ -100,7 +100,7 @@ export function UserCard({ user, currentMonthLabel }: UserCardProps) {
         </div>
         <div className="panel-muted p-3">
           <p className="text-xs uppercase tracking-[0.16em] text-ink/45">
-            {user.displayMode === "weight" ? "Lost" : "Target loss"}
+            {user.displayMode === "weight" ? "Total lost" : "Target loss"}
           </p>
           <p className="mt-2 font-semibold text-ink">
             {user.displayMode === "weight"
