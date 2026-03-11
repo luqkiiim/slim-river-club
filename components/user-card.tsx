@@ -50,23 +50,30 @@ function buildMonthlyProgressContent(user: DashboardUserSummary, currentMonthLab
         label: "Required",
         value: user.monthlyStatus === "EXEMPT" ? "Exempt" : formatWeight(user.currentMonthRequiredLossKg),
       },
-      {
-        label: "Status",
-        value: user.monthlyStatus === "EXEMPT" ? "Started mid-month" : user.monthlyStatus,
-      },
     ] as const,
   };
 }
 
 export function UserCard({ user, currentMonthLabel }: UserCardProps) {
   const progressContent = buildMonthlyProgressContent(user, currentMonthLabel);
+  const targetText =
+    user.displayMode === "weight" && user.targetWeight !== null
+      ? `Target ${formatWeight(user.targetWeight)}`
+      : user.targetLossKg !== null
+        ? `Target ${formatWeight(user.targetLossKg)} loss`
+        : "Target not set";
+  const lastLoggedText = user.lastLoggedAt
+    ? `Last logged ${user.lastLoggedAt}`
+    : user.displayMode === "weight"
+      ? "No weigh-ins yet"
+      : "No progress updates yet";
 
   return (
-    <article className="panel p-5 sm:p-6">
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <article className="panel p-4 sm:p-5">
+      <div className="mb-4 flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-xl font-semibold [font-family:var(--font-heading)]">{user.name}</h3>
+            <h3 className="text-lg font-semibold [font-family:var(--font-heading)] sm:text-xl">{user.name}</h3>
             {user.isPrivate ? (
               <span className="rounded-full bg-sand px-2.5 py-1 text-[11px] font-semibold text-ink/70">Private</span>
             ) : null}
@@ -82,7 +89,7 @@ export function UserCard({ user, currentMonthLabel }: UserCardProps) {
 
       <ProgressBar title={progressContent.title} progressPct={progressContent.progressPct} metrics={progressContent.metrics} />
 
-      <div className="mt-5 grid grid-cols-2 gap-3 text-sm lg:grid-cols-3">
+      <div className="mt-4 grid grid-cols-2 gap-2.5 text-sm">
         <div className="panel-muted p-3">
           <p className="text-xs uppercase tracking-[0.16em] text-ink/45">
             {user.displayMode === "weight" ? "Current" : "Total lost"}
@@ -103,37 +110,14 @@ export function UserCard({ user, currentMonthLabel }: UserCardProps) {
                 : "Not set"}
           </p>
         </div>
-        <div className="panel-muted p-3">
-          <p className="text-xs uppercase tracking-[0.16em] text-ink/45">{currentMonthLabel}</p>
-          <p className="mt-2 font-semibold text-ink">
-            {user.monthlyStatus === "EXEMPT"
-              ? "Started mid-month"
-              : user.currentMonthEntryCount > 0
-              ? `${formatWeight(user.currentMonthLoss)} of ${formatWeight(user.currentMonthRequiredLossKg)}`
-              : `Target ${formatWeight(user.currentMonthRequiredLossKg)}`}
-          </p>
-          <p className="mt-1 text-xs text-ink/55">
-            {user.currentMonthTargetPct === 100 ? "Normal month rule" : `${user.currentMonthTargetPct}% month rule`}
-          </p>
-        </div>
       </div>
 
-      <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="space-y-1">
-          <p className="text-sm text-ink/65">
-            {user.displayMode === "weight" && user.targetWeight !== null
-              ? `Target is ${formatWeight(user.targetWeight)}.`
-              : user.targetLossKg !== null
-                ? `Target is ${formatWeight(user.targetLossKg)} loss.`
-                : "Target not set yet."}
-          </p>
-          <p className="text-sm text-ink/55">
-            {user.lastLoggedAt
-              ? `Last logged ${user.lastLoggedAt}`
-              : user.displayMode === "weight"
-                ? "No weigh-ins yet"
-                : "No progress updates yet"}
-          </p>
+      <div className="mt-4 flex flex-col gap-2.5 border-t border-black/5 pt-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink/60">
+          <p>{targetText}</p>
+          <span className="hidden text-ink/35 sm:inline">•</span>
+          <p>{lastLoggedText}</p>
+          {user.currentMonthTargetPct !== 100 ? <p>{user.currentMonthTargetPct}% month rule</p> : null}
         </div>
         <Link className="text-sm font-semibold text-moss underline-offset-4 hover:underline" href={`/users/${user.id}`}>
           View profile

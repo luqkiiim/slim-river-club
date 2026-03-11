@@ -15,8 +15,8 @@ function LeaderboardList({
   rows: LeaderboardRow[];
 }) {
   return (
-    <section className="panel p-5 sm:p-6">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
+    <section className="panel p-4 sm:p-5">
+      <div className="mb-4 flex flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-lg font-semibold [font-family:var(--font-heading)]">{title}</h2>
         <span className="text-xs font-semibold uppercase tracking-[0.2em] text-ink/45">Leaderboard</span>
       </div>
@@ -26,15 +26,15 @@ function LeaderboardList({
           No rankings yet.
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {rows.map((row, index) => (
             <Link
               key={`${title}-${row.userId}`}
               href={`/users/${row.userId}`}
-              className="flex items-center justify-between gap-3 rounded-2xl border border-black/5 bg-white/80 px-4 py-3 transition hover:border-moss/30 hover:bg-white"
+              className="flex items-center justify-between gap-3 rounded-2xl border border-black/5 bg-white/80 px-4 py-2.5 transition hover:border-moss/30 hover:bg-white"
             >
               <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sand text-sm font-semibold text-moss">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sand text-sm font-semibold text-moss">
                   {index + 1}
                 </div>
                 <span className="truncate font-medium text-ink">{row.name}</span>
