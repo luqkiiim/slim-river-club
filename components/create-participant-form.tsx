@@ -8,7 +8,15 @@ import { createParticipantProfileAction } from "@/lib/actions/admin-actions";
 import { RM_PENALTY, currentDateInputValue } from "@/lib/weight-utils";
 import { initialActionState } from "@/types/form";
 
-export function CreateParticipantForm() {
+export function CreateParticipantForm({
+  onClose,
+  onCreated,
+  variant = "standalone",
+}: {
+  onClose?: () => void;
+  onCreated?: () => void;
+  variant?: "embedded" | "standalone";
+}) {
   const router = useRouter();
   const [latestClaimCode, setLatestClaimCode] = useState<string | null>(null);
   const [privacyMode, setPrivacyMode] = useState<"public" | "private">("public");
@@ -17,18 +25,27 @@ export function CreateParticipantForm() {
   useEffect(() => {
     if (state.status === "success") {
       setLatestClaimCode(state.claimCode ?? null);
-      router.refresh();
+
+      if (variant === "standalone") {
+        router.refresh();
+      } else {
+        onCreated?.();
+      }
     }
-  }, [router, state.claimCode, state.status]);
+  }, [onCreated, router, state.claimCode, state.status, variant]);
+
+  const isStandalone = variant === "standalone";
 
   return (
-    <section className="panel mb-6 p-5 sm:p-6">
-      <div className="mb-4">
-        <h2 className="text-lg font-semibold [font-family:var(--font-heading)]">Create participant</h2>
-        <p className="text-sm text-ink/65">
-          Create a profile, backfill the right kind of history now, and share the claim code later.
-        </p>
-      </div>
+    <section className={isStandalone ? "panel mb-6 p-5 sm:p-6" : ""}>
+      {isStandalone ? (
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold [font-family:var(--font-heading)]">Create participant</h2>
+          <p className="text-sm text-ink/65">
+            Create a profile, backfill the right kind of history now, and share the claim code later.
+          </p>
+        </div>
+      ) : null}
 
       {state.message ? (
         <div
@@ -113,6 +130,14 @@ export function CreateParticipantForm() {
           <p className="text-sm font-semibold text-ink">Latest claim code</p>
           <p className="mt-1 text-sm text-ink/65">Send this code to the participant so they can sign up and claim the profile.</p>
           <CopyValueField value={latestClaimCode} buttonLabel="Copy code" />
+
+          {variant === "embedded" && onClose ? (
+            <div className="mt-4 flex justify-end">
+              <button className="secondary-button" onClick={onClose} type="button">
+                Back to workspace
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </section>
