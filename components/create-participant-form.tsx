@@ -42,7 +42,7 @@ export function CreateParticipantForm() {
         </div>
       ) : null}
 
-      <form action={formAction} className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+      <form action={formAction} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <label className="block space-y-2 text-sm font-medium text-ink">
           <span>Name</span>
           <input className="field" name="name" type="text" autoComplete="off" required />
@@ -89,13 +89,13 @@ export function CreateParticipantForm() {
             </label>
           </>
         ) : (
-          <label className="block space-y-2 text-sm font-medium text-ink lg:col-span-2">
+          <label className="block space-y-2 text-sm font-medium text-ink md:col-span-2 xl:col-span-2">
             <span>Target loss</span>
             <input className="field" name="targetLossKg" type="number" step="0.01" min="0.01" required />
           </label>
         )}
 
-        <div className="flex items-end md:col-span-2 xl:col-span-1">
+        <div className="flex items-end md:col-span-2 xl:col-span-4">
           <button className="primary-button w-full lg:w-auto" type="submit" disabled={isPending}>
             {isPending ? "Creating..." : "Create"}
           </button>

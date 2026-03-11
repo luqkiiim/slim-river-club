@@ -10,7 +10,41 @@ import { WeightTable } from "@/components/weight-table";
 import { getUserProfilePayload } from "@/lib/data";
 import { requireSession } from "@/lib/session";
 import { formatDate, formatRm, formatWeight, getMonthLabel } from "@/lib/weight-utils";
-import type { UserProfilePayload } from "@/types/app";
+import type { MonthlyStatus, UserProfilePayload } from "@/types/app";
+
+function profileStatusClasses(status: MonthlyStatus) {
+  if (status === "GOAL REACHED") {
+    return "bg-leaf/15 text-moss";
+  }
+
+  if (status === "EXEMPT") {
+    return "bg-sand text-ink/75";
+  }
+
+  if (status === "PASSED") {
+    return "bg-[#dbe9dd] text-moss";
+  }
+
+  return "bg-blush/15 text-[#8f4a36]";
+}
+
+function SummaryCard({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail?: string;
+}) {
+  return (
+    <div className="panel-muted p-4">
+      <p className="text-xs uppercase tracking-[0.16em] text-ink/45">{label}</p>
+      <p className="mt-2 font-semibold text-ink">{value}</p>
+      {detail ? <p className="mt-1 text-xs text-ink/55">{detail}</p> : null}
+    </div>
+  );
+}
 
 function buildProgressContent(displayMode: "weight" | "loss", user: UserProfilePayload["user"]) {
   if (displayMode === "weight" && user.startWeight !== null && user.currentWeight !== null && user.targetWeight !== null) {
@@ -67,35 +101,47 @@ export default async function UserProfilePage({
       </div>
 
       <section className="panel mb-6 p-5 sm:p-6">
-        <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-sm text-ink/65">{payload.user.email ?? "No email linked yet"}</p>
-            <p className="mt-2 text-sm text-ink/65">
-              Monthly status: <span className="font-semibold text-ink">{payload.user.monthlyStatus}</span>
-            </p>
-            <p className="mt-2 text-sm text-ink/65">
-              Monthly target: <span className="font-semibold text-ink">{formatWeight(payload.user.monthlyLossTargetKg)}</span>
-            </p>
-            <p className="mt-2 text-sm text-ink/65">
-              This month requires:{" "}
-              <span className="font-semibold text-ink">
-                {formatWeight(payload.user.currentMonthRequiredLossKg)}
-                {payload.user.currentMonthTargetPct !== 100 ? ` (${payload.user.currentMonthTargetPct}% rule)` : ""}
-              </span>
-            </p>
-            <p className="mt-2 text-sm text-ink/65">
-              Penalty if missed: <span className="font-semibold text-ink">{formatRm(payload.user.monthlyPenaltyRm)}</span>
-            </p>
-            <p className="mt-2 text-sm text-ink/65">
-              Challenge start:{" "}
-              <span className="font-semibold text-ink">
-                {payload.user.challengeStartDateIso ? formatDate(new Date(payload.user.challengeStartDateIso)) : "Not set"}
-              </span>
-            </p>
+        <div className="mb-5 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-sm text-ink/65">{payload.user.email ?? "No email linked yet"}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <span className={`status-chip ${profileStatusClasses(payload.user.monthlyStatus)}`}>{payload.user.monthlyStatus}</span>
+                  {payload.user.currentMonthTargetPct !== 100 ? (
+                    <span className="status-chip bg-white text-ink/60">{payload.user.currentMonthTargetPct}% month rule</span>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <SummaryCard
+                label="Monthly target"
+                value={formatWeight(payload.user.monthlyLossTargetKg)}
+              />
+              <SummaryCard
+                label="This month requires"
+                value={formatWeight(payload.user.currentMonthRequiredLossKg)}
+                detail={payload.user.currentMonthTargetPct !== 100 ? `${payload.user.currentMonthTargetPct}% group month rule applied` : "Normal month rule"}
+              />
+              <SummaryCard
+                label="Penalty if missed"
+                value={formatRm(payload.user.monthlyPenaltyRm)}
+              />
+              <SummaryCard
+                label="Challenge start"
+                value={payload.user.challengeStartDateIso ? formatDate(new Date(payload.user.challengeStartDateIso)) : "Not set"}
+              />
+            </div>
           </div>
-          <div className="rounded-3xl bg-sand/70 px-4 py-3 text-right">
+
+          <div className="rounded-3xl bg-sand/70 px-5 py-5">
             <p className="text-xs uppercase tracking-[0.18em] text-ink/45">Total RM owed</p>
-            <p className="mt-2 text-2xl font-semibold [font-family:var(--font-heading)]">{formatRm(payload.user.totalRmOwed)}</p>
+            <p className="mt-3 text-3xl font-semibold [font-family:var(--font-heading)]">{formatRm(payload.user.totalRmOwed)}</p>
+            <p className="mt-3 text-sm text-ink/60">
+              Closed-month penalties accumulate here. Exempt months add nothing.
+            </p>
           </div>
         </div>
 

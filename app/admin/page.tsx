@@ -558,7 +558,7 @@ export default async function AdminPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-moss">Admin</p>
           <h1 className="mt-2 text-3xl font-semibold [font-family:var(--font-heading)]">Manage users and entries</h1>
           <p className="mt-2 max-w-2xl text-sm text-ink/70">
-            Participants now live in focused cards, so rules, targets, and access stay grouped together instead of spreading across a wide table.
+            Rules, access, and history tools stay grouped here so you can adjust the club without hopping across multiple screens.
           </p>
         </div>
         <Link className="secondary-button" href="/dashboard">
@@ -704,13 +704,12 @@ export default async function AdminPage() {
           <div>
             <h2 className="text-lg font-semibold [font-family:var(--font-heading)]">Backfill and edit participant history</h2>
             <p className="mt-1 text-sm text-ink/65">
-              Public participants use actual weights. Private participants use change logs only until they claim and add their own starting weight.
+              Use the quick-entry forms below, then adjust saved history further down if needed.
             </p>
           </div>
           <div className="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-ink/45">
             <span className="rounded-full bg-sand px-3 py-1">Public {publicParticipants.length}</span>
             <span className="rounded-full bg-sand px-3 py-1">Private {privateParticipants.length}</span>
-            <span className="rounded-full bg-sand px-3 py-1">Entries {entries.length}</span>
           </div>
         </div>
 
@@ -818,6 +817,14 @@ export default async function AdminPage() {
           </div>
         ) : (
           <>
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h3 className="text-base font-semibold text-ink">Entry history</h3>
+                <p className="mt-1 text-sm text-ink/60">Edit or remove recorded weigh-ins and private change logs here.</p>
+              </div>
+              <span className="status-chip bg-white text-ink/60">{entries.length} entries</span>
+            </div>
+
             <div className="space-y-4 sm:hidden">
               {entries.map((entry) => (
                 <article key={entry.id} className="rounded-3xl border border-black/10 bg-white/80 p-4">

@@ -24,8 +24,8 @@ export default async function DashboardPage() {
             <h1 className="text-3xl font-semibold [font-family:var(--font-heading)] sm:text-4xl">Slim River Club</h1>
             <p className="mt-2 max-w-2xl text-sm text-ink/70">
               {session.user.isParticipant
-                ? `Welcome back, ${session.user.name}. The system automatically calculates monthly penalties using each participant's own monthly target, penalty amount, challenge start date, and any special month rules from admin.`
-                : `Welcome back, ${session.user.name}. This account has admin-only access and is excluded from the tracked member list, penalties, and leaderboards.`}
+                ? `Welcome back, ${session.user.name}. Monthly results already reflect each participant's own target, penalty rule, challenge start, and any active special-month discount.`
+                : `Welcome back, ${session.user.name}. This account can manage the club without appearing in tracking, penalties, or leaderboards.`}
             </p>
           </div>
         </div>
