@@ -73,7 +73,11 @@ export function UserCard({ user, currentMonthLabel }: UserCardProps) {
       <div className="mb-4 flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-lg font-semibold [font-family:var(--font-heading)] sm:text-xl">{user.name}</h3>
+            <h3 className="text-lg font-semibold [font-family:var(--font-heading)] sm:text-xl">
+              <Link className="underline-offset-4 transition hover:text-moss hover:underline" href={`/users/${user.id}`}>
+                {user.name}
+              </Link>
+            </h3>
             {user.isPrivate ? (
               <span className="rounded-full bg-sand px-2.5 py-1 text-[11px] font-semibold text-ink/70">Private</span>
             ) : null}
