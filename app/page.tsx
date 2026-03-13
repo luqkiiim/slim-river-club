@@ -9,5 +9,5 @@ export default async function HomePage() {
     redirect("/login");
   }
 
-  redirect(session.user.isParticipant ? "/dashboard" : "/admin");
+  redirect("/dashboard");
 }

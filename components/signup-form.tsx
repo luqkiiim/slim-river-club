@@ -71,6 +71,11 @@ export function SignupForm({ allowAdminOnly }: SignupFormProps) {
                 <input className="field" name="password" type="password" autoComplete="new-password" required />
               </label>
 
+              <label className="block space-y-2 text-sm font-medium text-ink sm:col-span-2">
+                <span>Confirm password</span>
+                <input className="field" name="confirmPassword" type="password" autoComplete="new-password" required />
+              </label>
+
               <label className="flex items-start gap-3 rounded-2xl border border-black/10 bg-sand/45 px-4 py-4 text-sm text-ink sm:col-span-2">
                 <input
                   className="mt-1 h-4 w-4"
@@ -120,6 +125,11 @@ export function SignupForm({ allowAdminOnly }: SignupFormProps) {
               <label className="block space-y-2 text-sm font-medium text-ink sm:col-span-2">
                 <span>Password</span>
                 <input className="field" name="password" type="password" autoComplete="new-password" required />
+              </label>
+
+              <label className="block space-y-2 text-sm font-medium text-ink sm:col-span-2">
+                <span>Confirm password</span>
+                <input className="field" name="confirmPassword" type="password" autoComplete="new-password" required />
               </label>
             </>
           )}

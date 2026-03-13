@@ -11,16 +11,24 @@ export async function signUpAction(_previousState: ActionState, formData: FormDa
   const claimCode = `${formData.get("claimCode") ?? ""}`.trim().toUpperCase();
   const email = `${formData.get("email") ?? ""}`.trim().toLowerCase();
   const password = `${formData.get("password") ?? ""}`;
+  const confirmPassword = `${formData.get("confirmPassword") ?? ""}`;
   const shouldTrackWeight = formData.get("trackWeight") !== null;
   const startingWeight = Number(formData.get("startingWeight"));
   const targetWeight = Number(formData.get("targetWeight"));
   const userCount = await prisma.user.count();
   const isFirstUser = userCount === 0;
 
-  if (!password || (isFirstUser && (!name || !email)) || (!isFirstUser && !email)) {
+  if (!password || !confirmPassword || (isFirstUser && (!name || !email)) || (!isFirstUser && !email)) {
     return {
       status: "error",
       message: "Please complete all fields.",
+    };
+  }
+
+  if (password !== confirmPassword) {
+    return {
+      status: "error",
+      message: "Passwords do not match.",
     };
   }
 
