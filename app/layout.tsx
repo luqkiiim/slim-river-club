@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
 
 import "@/app/globals.css";
@@ -18,6 +18,7 @@ export const metadata: Metadata = {
   title: "Slim River Club",
   description: "Mobile-friendly office weight loss tracker with per-participant monthly targets and penalty rules.",
   applicationName: "Slim River Club",
+  manifest: "/manifest.webmanifest",
   icons: {
     apple: [{ url: "/apple-icon.png" }],
   },
@@ -26,6 +27,13 @@ export const metadata: Metadata = {
     title: "Slim River Club",
     statusBarStyle: "default",
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#f8f2e8",
 };
 
 export default function RootLayout({
