@@ -245,6 +245,12 @@ function buildDashboardUser(
   const currentMonth = getCurrentMonthPeriod();
   const currentMonthTargetPct = getTargetRatioPctForPeriod(monthPolicies, currentMonth);
   const currentMonthRequiredLossKg = getRequiredLossKg(tracking.monthlyLossTargetKg, currentMonthTargetPct);
+  const currentMonthStartWeight =
+    tracking.displayMode === "weight"
+      ? getLatestResolvedWeightBefore(tracking.timeline, currentMonth.start) ?? user.startWeight
+      : null;
+  const currentMonthTargetWeight =
+    currentMonthStartWeight !== null ? roundTo(currentMonthStartWeight - currentMonthRequiredLossKg, 2) : null;
   const currentMonthEntries = user.weightEntries.filter(
     (entry) => entry.date.getTime() >= currentMonth.start.getTime() && entry.date.getTime() <= currentMonth.end.getTime(),
   );
@@ -265,6 +271,7 @@ function buildDashboardUser(
     targetLossKg: tracking.targetLossKg,
     monthlyLossTargetKg: tracking.monthlyLossTargetKg,
     currentMonthRequiredLossKg,
+    currentMonthTargetWeight,
     currentMonthTargetPct,
     monthlyPenaltyRm: tracking.monthlyPenaltyRm,
     challengeStartDateIso: tracking.challengeStartDate.toISOString(),

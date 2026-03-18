@@ -126,6 +126,15 @@ export default async function UserProfilePage({
                 detail={payload.user.currentMonthTargetPct !== 100 ? `${payload.user.currentMonthTargetPct}% group month rule applied` : "Normal month rule"}
               />
               <SummaryCard
+                label="This month target weight"
+                value={
+                  payload.displayMode === "weight" && payload.user.currentMonthTargetWeight !== null
+                    ? formatWeight(payload.user.currentMonthTargetWeight)
+                    : "Not available"
+                }
+                detail="Month-start weight minus this month required loss"
+              />
+              <SummaryCard
                 label="Penalty if missed"
                 value={formatRm(payload.user.monthlyPenaltyRm)}
               />

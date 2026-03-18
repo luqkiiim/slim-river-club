@@ -30,6 +30,7 @@ export interface DashboardUserSummary {
   targetLossKg: number | null;
   monthlyLossTargetKg: number;
   currentMonthRequiredLossKg: number;
+  currentMonthTargetWeight: number | null;
   currentMonthTargetPct: number;
   monthlyPenaltyRm: number;
   challengeStartDateIso: string | null;
