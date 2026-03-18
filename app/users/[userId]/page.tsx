@@ -132,7 +132,6 @@ export default async function UserProfilePage({
                     ? formatWeight(payload.user.currentMonthTargetWeight)
                     : "Not available"
                 }
-                detail="Month-start weight minus this month required loss"
               />
               <SummaryCard
                 label="Penalty if missed"
