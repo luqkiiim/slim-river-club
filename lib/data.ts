@@ -202,7 +202,7 @@ function buildBmiSummary(
   user: Pick<UserWithRelations, "isPrivate" | "heightCm" | "startWeight">,
   tracking: Pick<TrackingState, "displayMode" | "currentWeight" | "targetWeight">,
 ): BmiSummary | null {
-  if (user.isPrivate || tracking.displayMode !== "weight") {
+  if (tracking.displayMode !== "weight") {
     return null;
   }
 
