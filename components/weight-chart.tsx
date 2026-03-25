@@ -4,6 +4,7 @@ import {
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -35,6 +36,8 @@ export function WeightChart({ mode, points, startValue, targetValue }: WeightCha
   const lowerBound = Math.min(...pointValues, startValue ?? pointValues[0], targetValue ?? pointValues[0]);
   const upperBound = Math.max(...pointValues, startValue ?? pointValues[0], targetValue ?? pointValues[0]);
   const yAxisDomain = lowerBound === upperBound ? [lowerBound - 1, upperBound + 1] : [lowerBound, upperBound];
+  const showStartGuide = startValue !== null;
+  const showTargetGuide = targetValue !== null && targetValue !== startValue;
 
   return (
     <div className="panel p-5 sm:p-6">
@@ -47,6 +50,24 @@ export function WeightChart({ mode, points, startValue, targetValue }: WeightCha
             ? "X axis is date, Y axis is weight."
             : "X axis is date, Y axis is total kg lost."}
         </p>
+        <div className="mt-3 flex flex-wrap gap-3 text-xs font-medium text-ink/60">
+          <span className="inline-flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-[#274235]" />
+            Progress line
+          </span>
+          {showStartGuide ? (
+            <span className="inline-flex items-center gap-2">
+              <span className="w-5 border-t-2 border-dashed border-ink/35" />
+              {mode === "weight" ? "Start guide" : "Baseline guide"}
+            </span>
+          ) : null}
+          {showTargetGuide ? (
+            <span className="inline-flex items-center gap-2">
+              <span className="w-5 border-t-2 border-dashed border-[#b8872f]" />
+              {mode === "weight" ? "Target guide" : "Goal guide"}
+            </span>
+          ) : null}
+        </div>
       </div>
 
       <div className="h-72 w-full">
@@ -60,6 +81,12 @@ export function WeightChart({ mode, points, startValue, targetValue }: WeightCha
               tick={{ fill: "#516151", fontSize: 12 }}
               tickFormatter={(value: number) => `${value}kg`}
             />
+            {showStartGuide ? (
+              <ReferenceLine y={startValue!} stroke="rgba(31,42,31,0.28)" strokeDasharray="6 6" ifOverflow="extendDomain" />
+            ) : null}
+            {showTargetGuide ? (
+              <ReferenceLine y={targetValue!} stroke="#b8872f" strokeDasharray="6 6" ifOverflow="extendDomain" />
+            ) : null}
             <Tooltip
               formatter={(value: number) => formatWeight(Number(value))}
               contentStyle={{

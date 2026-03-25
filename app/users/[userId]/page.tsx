@@ -9,8 +9,8 @@ import { WeightChart } from "@/components/weight-chart";
 import { WeightTable } from "@/components/weight-table";
 import { getUserProfilePayload } from "@/lib/data";
 import { requireSession } from "@/lib/session";
-import { formatDate, formatRm, formatWeight, getMonthLabel } from "@/lib/weight-utils";
-import type { MonthlyStatus } from "@/types/app";
+import { formatDate, formatRm, formatWeight, getCurrentMonthPeriod, getMonthLabel, roundTo } from "@/lib/weight-utils";
+import type { DashboardUserSummary, MonthlyStatus } from "@/types/app";
 
 function profileStatusClasses(status: MonthlyStatus) {
   if (status === "GOAL REACHED") {
@@ -38,7 +38,7 @@ function SummaryCard({
   detail?: string;
 }) {
   return (
-    <div className="panel-muted p-4">
+    <div className="panel-muted h-full p-4">
       <p className="text-xs uppercase tracking-[0.16em] text-ink/45">{label}</p>
       <p className="mt-2 font-semibold text-ink">{value}</p>
       {detail ? <p className="mt-1 text-xs text-ink/55">{detail}</p> : null}
@@ -46,8 +46,112 @@ function SummaryCard({
   );
 }
 
-function getProgressTitle(displayMode: "weight" | "loss") {
-  return displayMode === "weight" ? "Progress toward target" : "Progress toward target loss";
+function PrimaryStatCard({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail?: string;
+}) {
+  return (
+    <div className="rounded-[26px] border border-black/5 bg-white/80 p-4 shadow-[0_16px_32px_rgba(31,42,31,0.04)]">
+      <p className="text-xs uppercase tracking-[0.18em] text-ink/45">{label}</p>
+      <p className="mt-3 text-3xl font-semibold [font-family:var(--font-heading)] text-ink">{value}</p>
+      {detail ? <p className="mt-2 text-sm text-ink/60">{detail}</p> : null}
+    </div>
+  );
+}
+
+interface InfoCardContent {
+  label: string;
+  value: string;
+  detail?: string;
+}
+
+function getProgressDescription(displayMode: "weight" | "loss", user: DashboardUserSummary) {
+  if (displayMode === "weight") {
+    return "This overview keeps your current weight, goal weight, and remaining gap easy to scan.";
+  }
+
+  if (user.needsStartingWeight) {
+    return "Private tracking is active, but a starting weight is still needed to unlock a full private history.";
+  }
+
+  return "Private tracking is active, so the overview focuses on kilograms lost, your goal, and what remains.";
+}
+
+function buildPrimaryStats(displayMode: "weight" | "loss", user: DashboardUserSummary): InfoCardContent[] {
+  if (displayMode === "weight") {
+    const remainingKg =
+      user.currentWeight !== null && user.targetWeight !== null
+        ? Math.max(roundTo(user.currentWeight - user.targetWeight, 2), 0)
+        : null;
+
+    return [
+      {
+        label: "Current",
+        value: user.currentWeight !== null ? formatWeight(user.currentWeight) : "Not available",
+        detail: user.startWeight !== null ? `Started at ${formatWeight(user.startWeight)}` : undefined,
+      },
+      {
+        label: "Target",
+        value: user.targetWeight !== null ? formatWeight(user.targetWeight) : "Not set",
+      },
+      {
+        label: "Remaining",
+        value: remainingKg !== null ? formatWeight(remainingKg) : "Not available",
+        detail: user.goalReached ? "Goal reached" : undefined,
+      },
+    ];
+  }
+
+  const remainingKg = user.targetLossKg !== null ? Math.max(roundTo(user.targetLossKg - user.kgLost, 2), 0) : null;
+
+  return [
+    {
+      label: "Lost",
+      value: formatWeight(user.kgLost),
+      detail: user.needsStartingWeight ? "Baseline pending" : "Private progress",
+    },
+    {
+      label: "Target",
+      value: user.targetLossKg !== null ? formatWeight(user.targetLossKg) : "Not set",
+    },
+    {
+      label: "Remaining",
+      value: remainingKg !== null ? formatWeight(remainingKg) : "Not available",
+      detail: user.goalReached ? "Goal reached" : undefined,
+    },
+  ];
+}
+
+function buildChallengeCards(displayMode: "weight" | "loss", user: DashboardUserSummary): InfoCardContent[] {
+  return [
+    {
+      label: "Monthly goal",
+      value: formatWeight(user.monthlyLossTargetKg),
+    },
+    {
+      label: "Needed this month",
+      value: formatWeight(user.currentMonthRequiredLossKg),
+    },
+    displayMode === "weight"
+      ? {
+          label: "Month-end target",
+          value: user.currentMonthTargetWeight !== null ? formatWeight(user.currentMonthTargetWeight) : "Not available",
+        }
+      : {
+          label: "Tracking mode",
+          value: user.needsStartingWeight ? "Baseline pending" : "Private loss-only",
+          detail: user.needsStartingWeight ? "Add your starting weight to unlock private history." : "Weight stays hidden on this profile.",
+        },
+    {
+      label: "Started",
+      value: user.challengeStartDateIso ? formatDate(new Date(user.challengeStartDateIso)) : "Not set",
+    },
+  ];
 }
 
 export default async function UserProfilePage({
@@ -63,7 +167,11 @@ export default async function UserProfilePage({
     notFound();
   }
 
-  const progressTitle = getProgressTitle(payload.displayMode);
+  const currentMonth = getCurrentMonthPeriod();
+  const currentMonthLabel = getMonthLabel(currentMonth.month, currentMonth.year);
+  const progressDescription = getProgressDescription(payload.displayMode, payload.user);
+  const primaryStats = buildPrimaryStats(payload.displayMode, payload.user);
+  const challengeCards = buildChallengeCards(payload.displayMode, payload.user);
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
@@ -76,122 +184,111 @@ export default async function UserProfilePage({
               <span className="rounded-full bg-sand px-2.5 py-1 text-[11px] font-semibold text-ink/70">Private</span>
             ) : null}
           </div>
+          <p className="mt-2 text-sm text-ink/65">{payload.user.email ?? "No email linked yet"}</p>
         </div>
         <Link className="secondary-button" href="/dashboard">
           Back to dashboard
         </Link>
       </div>
 
-      <section className="panel mb-6 p-5 sm:p-6">
-        <div className="mb-5 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-sm text-ink/65">{payload.user.email ?? "No email linked yet"}</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <span className={`status-chip ${profileStatusClasses(payload.user.monthlyStatus)}`}>{payload.user.monthlyStatus}</span>
-                  {payload.user.currentMonthTargetPct !== 100 ? (
-                    <span className="status-chip bg-white text-ink/60">{payload.user.currentMonthTargetPct}% month rule</span>
-                  ) : null}
-                </div>
+      <section className="panel mb-4 overflow-hidden p-5 sm:p-6">
+        <div className="rounded-[30px] bg-[linear-gradient(135deg,rgba(255,255,255,0.84),rgba(248,215,167,0.3))] p-5 sm:p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-moss">Progress overview</p>
+          <div className="mt-3 flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+            <div className="max-w-2xl">
+              <h2 className="text-2xl font-semibold [font-family:var(--font-heading)] sm:text-3xl">Overall progress</h2>
+              <p className="mt-2 text-sm leading-6 text-ink/68">{progressDescription}</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <span className={`status-chip ${profileStatusClasses(payload.user.monthlyStatus)}`}>{payload.user.monthlyStatus}</span>
+                {payload.user.currentMonthTargetPct !== 100 ? (
+                  <span className="status-chip bg-white text-ink/60">{payload.user.currentMonthTargetPct}% rule this month</span>
+                ) : null}
+                {payload.user.goalReached ? (
+                  <span className="status-chip bg-leaf/15 text-moss">Goal reached</span>
+                ) : null}
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <SummaryCard
-                label="Monthly target"
-                value={formatWeight(payload.user.monthlyLossTargetKg)}
-              />
-              <SummaryCard
-                label="This month requires"
-                value={formatWeight(payload.user.currentMonthRequiredLossKg)}
-                detail={payload.user.currentMonthTargetPct !== 100 ? `${payload.user.currentMonthTargetPct}% group month rule applied` : "Normal month rule"}
-              />
-              <SummaryCard
-                label="This month target weight"
-                value={
-                  payload.displayMode === "weight" && payload.user.currentMonthTargetWeight !== null
-                    ? formatWeight(payload.user.currentMonthTargetWeight)
-                    : "Not available"
-                }
-              />
-              <SummaryCard
-                label="Penalty if missed"
-                value={formatRm(payload.user.monthlyPenaltyRm)}
-              />
-              <SummaryCard
-                label="Challenge start"
-                value={payload.user.challengeStartDateIso ? formatDate(new Date(payload.user.challengeStartDateIso)) : "Not set"}
+            <div className="w-full max-w-xl rounded-[26px] border border-black/5 bg-white/72 p-4 sm:p-5">
+              <ProgressBar
+                title={payload.displayMode === "weight" ? "Goal completion" : "Target completion"}
+                progressPct={payload.user.progressPct}
               />
             </div>
           </div>
-
-          <div className="rounded-3xl bg-sand/70 px-5 py-5">
-            <p className="text-xs uppercase tracking-[0.18em] text-ink/45">Total RM owed</p>
-            <p className="mt-3 text-3xl font-semibold [font-family:var(--font-heading)]">{formatRm(payload.user.totalRmOwed)}</p>
-            <p className="mt-3 text-sm text-ink/60">
-              Closed-month penalties accumulate here. Exempt months add nothing.
-            </p>
-          </div>
         </div>
 
-        <ProgressBar title={progressTitle} progressPct={payload.user.progressPct} />
-
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <div className="panel-muted p-4">
-            <p className="text-xs uppercase tracking-[0.16em] text-ink/45">
-              {payload.displayMode === "weight" ? "Current weight" : "Total lost"}
-            </p>
-            <p className="mt-2 font-semibold text-ink">
-              {payload.displayMode === "weight" && payload.user.currentWeight !== null
-                ? formatWeight(payload.user.currentWeight)
-                : formatWeight(payload.user.kgLost)}
-            </p>
-          </div>
-          <div className="panel-muted p-4">
-            <p className="text-xs uppercase tracking-[0.16em] text-ink/45">
-              {payload.displayMode === "weight" ? "Total lost" : "Target loss"}
-            </p>
-            <p className="mt-2 font-semibold text-ink">
-              {payload.displayMode === "weight"
-                ? formatWeight(payload.user.kgLost)
-                : payload.user.targetLossKg !== null
-                  ? formatWeight(payload.user.targetLossKg)
-                  : "Not set"}
-            </p>
-          </div>
-          <div className="panel-muted p-4">
-            <p className="text-xs uppercase tracking-[0.16em] text-ink/45">
-              {payload.displayMode === "weight" ? "Target weight" : "Progress"}
-            </p>
-            <p className="mt-2 font-semibold text-ink">
-              {payload.displayMode === "weight" && payload.user.targetWeight !== null
-                ? formatWeight(payload.user.targetWeight)
-                : `${payload.user.progressPct}%`}
-            </p>
-          </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          {primaryStats.map((stat) => (
+            <PrimaryStatCard key={stat.label} label={stat.label} value={stat.value} detail={stat.detail} />
+          ))}
         </div>
-
-        {payload.canEditStartingWeight || payload.canManagePrivacy ? (
-          <div className="mt-5 space-y-4">
-            {payload.canEditStartingWeight ? (
-              <PrivateStartingWeightForm currentValue={payload.user.startWeight} />
-            ) : null}
-            {payload.canManagePrivacy ? <ParticipantPrivacyForm isPrivate={payload.user.isPrivate} /> : null}
-          </div>
-        ) : null}
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
-        <div className="space-y-6">
-          <WeightChart
-            mode={payload.displayMode}
-            points={payload.chartPoints}
-            startValue={payload.displayMode === "weight" ? payload.user.startWeight : 0}
-            targetValue={payload.displayMode === "weight" ? payload.user.targetWeight : payload.user.targetLossKg}
-          />
-          {payload.bmi ? <BmiMeter bmi={payload.bmi} /> : null}
-        </div>
+      <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+        <section className="panel p-5 sm:p-6">
+          <div className="mb-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-moss">Challenge details</p>
+            <h2 className="mt-1.5 text-2xl font-semibold [font-family:var(--font-heading)]">Rules for {currentMonthLabel}</h2>
+            <p className="mt-1.5 text-sm text-ink/65">Monthly targets and timing live here so the progress story stays cleaner up top.</p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {challengeCards.map((card) => (
+              <SummaryCard key={card.label} label={card.label} value={card.value} detail={card.detail} />
+            ))}
+          </div>
+        </section>
+
+        <section className="panel p-5 sm:p-6">
+          <div className="mb-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-moss">Penalty summary</p>
+            <h2 className="mt-1.5 text-2xl font-semibold [font-family:var(--font-heading)]">Accountability</h2>
+            <p className="mt-1.5 text-sm text-ink/65">Penalties only come from closed months that finish below the required loss.</p>
+          </div>
+
+          <div className="rounded-[28px] bg-sand/70 p-5">
+            <p className="text-xs uppercase tracking-[0.18em] text-ink/45">Total RM owed</p>
+            <p className="mt-3 text-3xl font-semibold [font-family:var(--font-heading)]">{formatRm(payload.user.totalRmOwed)}</p>
+            <p className="mt-2 text-sm text-ink/60">Exempt opening months add nothing to this total.</p>
+          </div>
+
+          <div className="mt-4 grid gap-3">
+            <SummaryCard
+              label="Missed-month penalty"
+              value={formatRm(payload.user.monthlyPenaltyRm)}
+              detail="Applied only after a month closes below the required loss."
+            />
+            <div className="rounded-[24px] border border-black/5 bg-white/65 p-4 text-sm text-ink/65">
+              Started mid-month? That opening month stays exempt from penalties.
+            </div>
+          </div>
+        </section>
+      </div>
+
+      {payload.canEditStartingWeight || payload.canManagePrivacy ? (
+        <section className="mt-6">
+          <div className="mb-3 px-1">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-moss">Settings</p>
+            <h2 className="mt-1 text-xl font-semibold [font-family:var(--font-heading)]">Profile settings</h2>
+            <p className="mt-1 text-sm text-ink/65">Account controls live separately from the analytics above.</p>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            {payload.canEditStartingWeight ? <PrivateStartingWeightForm currentValue={payload.user.startWeight} /> : null}
+            {payload.canManagePrivacy ? <ParticipantPrivacyForm isPrivate={payload.user.isPrivate} /> : null}
+          </div>
+        </section>
+      ) : null}
+
+      <div className="mt-6 space-y-6">
+        <WeightChart
+          mode={payload.displayMode}
+          points={payload.chartPoints}
+          startValue={payload.displayMode === "weight" ? payload.user.startWeight : 0}
+          targetValue={payload.displayMode === "weight" ? payload.user.targetWeight : payload.user.targetLossKg}
+        />
+        {payload.bmi ? <BmiMeter bmi={payload.bmi} /> : null}
         <WeightTable mode={payload.displayMode} rows={payload.history} />
       </div>
 
