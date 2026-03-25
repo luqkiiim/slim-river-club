@@ -10,7 +10,7 @@ import { WeightTable } from "@/components/weight-table";
 import { getUserProfilePayload } from "@/lib/data";
 import { requireSession } from "@/lib/session";
 import { formatDate, formatRm, formatWeight, getMonthLabel } from "@/lib/weight-utils";
-import type { MonthlyStatus, UserProfilePayload } from "@/types/app";
+import type { MonthlyStatus } from "@/types/app";
 
 function profileStatusClasses(status: MonthlyStatus) {
   if (status === "GOAL REACHED") {
@@ -46,26 +46,8 @@ function SummaryCard({
   );
 }
 
-function buildProgressContent(displayMode: "weight" | "loss", user: UserProfilePayload["user"]) {
-  if (displayMode === "weight" && user.startWeight !== null && user.currentWeight !== null && user.targetWeight !== null) {
-    return {
-      title: "Progress toward target",
-      metrics: [
-        { label: "Start", value: formatWeight(user.startWeight) },
-        { label: "Current", value: formatWeight(user.currentWeight) },
-        { label: "Target", value: formatWeight(user.targetWeight) },
-      ] as const,
-    };
-  }
-
-  return {
-    title: "Progress toward target loss",
-    metrics: [
-      { label: "Mode", value: user.needsStartingWeight ? "Baseline pending" : "Private" },
-      { label: "Lost", value: formatWeight(user.kgLost) },
-      { label: "Target", value: user.targetLossKg !== null ? formatWeight(user.targetLossKg) : "Not set" },
-    ] as const,
-  };
+function getProgressTitle(displayMode: "weight" | "loss") {
+  return displayMode === "weight" ? "Progress toward target" : "Progress toward target loss";
 }
 
 export default async function UserProfilePage({
@@ -81,7 +63,7 @@ export default async function UserProfilePage({
     notFound();
   }
 
-  const progressContent = buildProgressContent(payload.displayMode, payload.user);
+  const progressTitle = getProgressTitle(payload.displayMode);
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
@@ -153,9 +135,9 @@ export default async function UserProfilePage({
           </div>
         </div>
 
-        <ProgressBar title={progressContent.title} progressPct={payload.user.progressPct} metrics={progressContent.metrics} />
+        <ProgressBar title={progressTitle} progressPct={payload.user.progressPct} />
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <div className="panel-muted p-4">
             <p className="text-xs uppercase tracking-[0.16em] text-ink/45">
               {payload.displayMode === "weight" ? "Current weight" : "Total lost"}
