@@ -50,24 +50,6 @@ export function WeightChart({ mode, points, startValue, targetValue }: WeightCha
             ? "X axis is date, Y axis is weight."
             : "X axis is date, Y axis is total kg lost."}
         </p>
-        <div className="mt-3 flex flex-wrap gap-3 text-xs font-medium text-ink/60">
-          <span className="inline-flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-[#274235]" />
-            Progress line
-          </span>
-          {showStartGuide ? (
-            <span className="inline-flex items-center gap-2">
-              <span className="w-5 border-t-2 border-dashed border-ink/35" />
-              {mode === "weight" ? "Start guide" : "Baseline guide"}
-            </span>
-          ) : null}
-          {showTargetGuide ? (
-            <span className="inline-flex items-center gap-2">
-              <span className="w-5 border-t-2 border-dashed border-[#b8872f]" />
-              {mode === "weight" ? "Target guide" : "Goal guide"}
-            </span>
-          ) : null}
-        </div>
       </div>
 
       <div className="h-72 w-full">
