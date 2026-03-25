@@ -15,7 +15,7 @@ export function WeightTable({ mode, rows }: WeightTableProps) {
         </h2>
         <p className="text-sm text-ink/65">
           {mode === "weight"
-            ? "Date and resolved weight, newest first."
+            ? "Date and resolved weight, oldest first."
             : "Date, change from the previous update, and total kg lost, newest first."}
         </p>
       </div>

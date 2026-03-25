@@ -9,7 +9,7 @@ import { WeightChart } from "@/components/weight-chart";
 import { WeightTable } from "@/components/weight-table";
 import { getUserProfilePayload } from "@/lib/data";
 import { requireSession } from "@/lib/session";
-import { formatDate, formatRm, formatWeight, getCurrentMonthPeriod, getMonthLabel, roundTo } from "@/lib/weight-utils";
+import { formatRm, formatWeight, getCurrentMonthPeriod, getMonthLabel, roundTo } from "@/lib/weight-utils";
 import type { DashboardUserSummary, MonthlyStatus } from "@/types/app";
 
 function profileStatusClasses(status: MonthlyStatus) {
@@ -138,10 +138,6 @@ function buildChallengeCards(displayMode: "weight" | "loss", user: DashboardUser
           label: "Tracking mode",
           value: user.needsStartingWeight ? "Baseline pending" : "Private loss-only",
         },
-    {
-      label: "Started",
-      value: user.challengeStartDateIso ? formatDate(new Date(user.challengeStartDateIso)) : "Not set",
-    },
   ];
 }
 
@@ -220,36 +216,18 @@ export default async function UserProfilePage({
         </div>
       </section>
 
-      <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-        <section className="panel p-5 sm:p-6">
-          <div className="mb-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-moss">Challenge details</p>
-            <h2 className="mt-1.5 text-2xl font-semibold [font-family:var(--font-heading)]">Rules for {currentMonthLabel}</h2>
-          </div>
+      <section className="panel p-5 sm:p-6">
+        <div className="mb-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-moss">Challenge details</p>
+          <h2 className="mt-1.5 text-2xl font-semibold [font-family:var(--font-heading)]">Rules for {currentMonthLabel}</h2>
+        </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            {challengeCards.map((card) => (
-              <SummaryCard key={card.label} label={card.label} value={card.value} />
-            ))}
-          </div>
-        </section>
-
-        <section className="panel p-5 sm:p-6">
-          <div className="mb-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-moss">Penalty summary</p>
-            <h2 className="mt-1.5 text-2xl font-semibold [font-family:var(--font-heading)]">Accountability</h2>
-          </div>
-
-          <div className="rounded-[28px] bg-sand/70 p-5">
-            <p className="text-xs uppercase tracking-[0.18em] text-ink/45">Total RM owed</p>
-            <p className="mt-3 text-3xl font-semibold [font-family:var(--font-heading)]">{formatRm(payload.user.totalRmOwed)}</p>
-          </div>
-
-          <div className="mt-4">
-            <SummaryCard label="Missed-month penalty" value={formatRm(payload.user.monthlyPenaltyRm)} />
-          </div>
-        </section>
-      </div>
+        <div className="grid gap-3 md:grid-cols-3">
+          {challengeCards.map((card) => (
+            <SummaryCard key={card.label} label={card.label} value={card.value} />
+          ))}
+        </div>
+      </section>
 
       {payload.canEditStartingWeight || payload.canManagePrivacy ? (
         <section className="mt-6">
@@ -273,6 +251,20 @@ export default async function UserProfilePage({
           targetValue={payload.displayMode === "weight" ? payload.user.targetWeight : payload.user.targetLossKg}
         />
         {payload.bmi ? <BmiMeter bmi={payload.bmi} /> : null}
+        <section className="panel p-5 sm:p-6">
+          <div className="mb-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-moss">Penalty summary</p>
+            <h2 className="mt-1.5 text-2xl font-semibold [font-family:var(--font-heading)]">Accountability</h2>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-[1.15fr_0.85fr]">
+            <div className="rounded-[28px] bg-sand/70 p-5">
+              <p className="text-xs uppercase tracking-[0.18em] text-ink/45">Total RM owed</p>
+              <p className="mt-3 text-3xl font-semibold [font-family:var(--font-heading)]">{formatRm(payload.user.totalRmOwed)}</p>
+            </div>
+            <SummaryCard label="Missed-month penalty" value={formatRm(payload.user.monthlyPenaltyRm)} />
+          </div>
+        </section>
         <WeightTable mode={payload.displayMode} rows={payload.history} />
       </div>
 
