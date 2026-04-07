@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { syncAllMonthlyResults, syncUserMonthlyResults } from "@/lib/data";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession, requireParticipantSession } from "@/lib/session";
-import { normalizeLoss, normalizeWeight, parseDateInput, parseMonthInput } from "@/lib/weight-utils";
+import { getCurrentAppDateAtNoon, normalizeLoss, normalizeWeight, parseDateInput, parseMonthInput } from "@/lib/weight-utils";
 import type { ActionState } from "@/types/form";
 
 function refreshAdminViews(userId: string) {
@@ -50,9 +50,7 @@ async function createClaimCode() {
 }
 
 function getMaxAllowedDate() {
-  const today = new Date();
-
-  return new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 23, 59, 59, 999));
+  return getCurrentAppDateAtNoon();
 }
 
 function isFutureDate(date: Date) {

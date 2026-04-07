@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { syncUserMonthlyResults } from "@/lib/data";
 import { prisma } from "@/lib/prisma";
 import { requireParticipantSession } from "@/lib/session";
-import { buildResolvedWeightTimeline, normalizeWeight, parseDateInput } from "@/lib/weight-utils";
+import { buildResolvedWeightTimeline, getCurrentAppDateAtNoon, normalizeWeight, parseDateInput } from "@/lib/weight-utils";
 import type { ActionState } from "@/types/form";
 
 export async function logWeightAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {
@@ -51,8 +51,7 @@ export async function logWeightAction(_previousState: ActionState, formData: For
   }
 
   const date = parseDateInput(dateValue);
-  const today = new Date();
-  const maxAllowedDate = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 23, 59, 59, 999));
+  const maxAllowedDate = getCurrentAppDateAtNoon();
 
   if (date.getTime() > maxAllowedDate.getTime()) {
     return {

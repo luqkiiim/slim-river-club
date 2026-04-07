@@ -6,6 +6,7 @@ import {
 
 export const RM_PENALTY = 30;
 export const MONTHLY_LOSS_TARGET_KG = 2;
+const APP_TIME_ZONE = "Asia/Kuala_Lumpur";
 
 export interface WeightEntryPoint {
   id: string;
@@ -120,23 +121,41 @@ export function parseMonthInput(value: string) {
   return { year, month };
 }
 
-export function currentDateInputValue() {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = `${today.getMonth() + 1}`.padStart(2, "0");
-  const day = `${today.getDate()}`.padStart(2, "0");
+function getDatePartsInAppTimeZone(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
 
-  return `${year}-${month}-${day}`;
+  const year = Number(parts.find((part) => part.type === "year")?.value);
+  const month = Number(parts.find((part) => part.type === "month")?.value);
+  const day = Number(parts.find((part) => part.type === "day")?.value);
+
+  if (!year || !month || !day) {
+    throw new Error("Unable to resolve app date parts.");
+  }
+
+  return { year, month, day };
+}
+
+export function currentDateInputValue() {
+  const { year, month, day } = getDatePartsInAppTimeZone(new Date());
+
+  return `${year}-${`${month}`.padStart(2, "0")}-${`${day}`.padStart(2, "0")}`;
 }
 
 export function currentMonthInputValue() {
-  const today = new Date();
+  const { year, month } = getDatePartsInAppTimeZone(new Date());
 
-  return formatMonthInput(today.getFullYear(), today.getMonth() + 1);
+  return formatMonthInput(year, month);
 }
 
-export function getCurrentUtcDateAtNoon(now = new Date()) {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 12, 0, 0));
+export function getCurrentAppDateAtNoon(now = new Date()) {
+  const { year, month, day } = getDatePartsInAppTimeZone(now);
+
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
 }
 
 export function calculateKgLost(startWeight: number, currentWeight: number) {
