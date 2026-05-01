@@ -46,7 +46,7 @@ export function LoginForm({ initialEmail, registrationSuccess, initialError }: L
       <div className="mb-8 space-y-2">
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-moss">One office group</p>
         <h1 className="text-3xl font-semibold [font-family:var(--font-heading)]">Log in</h1>
-        <p className="text-sm text-ink/70">Track weight, monitor penalties, and keep the leaderboard honest.</p>
+        <p className="text-sm text-ink/70">Track weight, follow monthly progress, and keep accountability clear.</p>
       </div>
 
       {registrationSuccess ? (

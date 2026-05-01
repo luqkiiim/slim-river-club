@@ -106,7 +106,7 @@ export function SignupForm({ allowAdminOnly }: SignupFormProps) {
                 </>
               ) : (
                 <div className="rounded-2xl border border-dashed border-black/10 px-4 py-5 text-sm text-ink/65 sm:col-span-2">
-                  This account will be created with admin access only and will stay out of the member dashboard, charts, penalties, and leaderboards.
+                  This account will be created with admin access only and will stay out of the member dashboard, charts, and accountability rules.
                 </div>
               )}
             </>

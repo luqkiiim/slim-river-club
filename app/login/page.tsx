@@ -21,7 +21,7 @@ export default async function LoginPage({
         <section className="flex flex-col justify-center">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-moss">Office weight loss tracker</p>
           <h1 className="mt-4 max-w-xl text-4xl font-semibold leading-tight [font-family:var(--font-heading)] sm:text-5xl">
-            Stay accountable, track progress, and auto-calculate each participant&apos;s monthly penalty.
+            Stay accountable, track progress, and keep each participant&apos;s monthly goal clear.
           </h1>
           <p className="mt-4 max-w-xl text-base text-ink/72">
             Built for a single office group with shared visibility, personal charts, and admin controls.

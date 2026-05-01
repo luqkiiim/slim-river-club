@@ -1,4 +1,5 @@
 export type MonthlyStatus = "PASSED" | "NEEDS MORE LOSS" | "GOAL REACHED" | "EXEMPT";
+export type MonthlyPaceStatus = "ON_TRACK" | "SLIGHTLY_BEHIND" | "BEHIND" | "NO_UPDATE" | "COMPLETE" | "EXEMPT";
 export type TrackingDisplayMode = "weight" | "loss";
 export type WeightEntryKind = "ABSOLUTE" | "LOSS_DELTA";
 
@@ -41,6 +42,9 @@ export interface DashboardUserSummary {
   monthlyStatus: MonthlyStatus;
   currentMonthLoss: number;
   currentMonthEntryCount: number;
+  currentMonthRemainingLossKg: number;
+  currentMonthPaceStatus: MonthlyPaceStatus;
+  currentMonthPaceMessage: string;
   personalBest: boolean;
   needsStartingWeight: boolean;
   lastLoggedAt?: string;
@@ -58,6 +62,10 @@ export interface GroupSummary {
   goalReachedCount: number;
   totalKgLost: number;
   totalRmOwed: number;
+  activeLoggersThisMonth: number;
+  currentMonthLoss: number;
+  currentMonthRequiredLossKg: number;
+  currentMonthProgressPct: number;
 }
 
 export interface ProfileHistoryRow {
@@ -117,6 +125,7 @@ export interface AdminUserSummary {
   totalKgLost: number;
   progressPct: number;
   totalRmOwed: number;
+  currentMonthPaceMessage: string | null;
   claimCode: string | null;
   needsStartingWeight: boolean;
   adminCanTogglePrivacy: boolean;

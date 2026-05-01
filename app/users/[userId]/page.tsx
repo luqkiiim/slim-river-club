@@ -9,7 +9,7 @@ import { WeightChart } from "@/components/weight-chart";
 import { WeightTable } from "@/components/weight-table";
 import { getUserProfilePayload } from "@/lib/data";
 import { requireSession } from "@/lib/session";
-import { formatRm, formatWeight, getCurrentMonthPeriod, getMonthLabel, roundTo } from "@/lib/weight-utils";
+import { formatMonthlyStatusLabel, formatRm, formatWeight, getCurrentMonthPeriod, getMonthLabel, roundTo } from "@/lib/weight-utils";
 import type { DashboardUserSummary, MonthlyStatus } from "@/types/app";
 
 function profileStatusClasses(status: MonthlyStatus) {
@@ -122,11 +122,11 @@ function buildPrimaryStats(displayMode: "weight" | "loss", user: DashboardUserSu
 function buildChallengeCards(displayMode: "weight" | "loss", user: DashboardUserSummary): InfoCardContent[] {
   return [
     {
-      label: "Monthly goal",
+      label: "Monthly target",
       value: formatWeight(user.monthlyLossTargetKg),
     },
     {
-      label: "Needed this month",
+      label: "This month target",
       value: formatWeight(user.currentMonthRequiredLossKg),
     },
     displayMode === "weight"
@@ -154,6 +154,7 @@ export default async function UserProfilePage({
     notFound();
   }
 
+  const isOwnProfile = payload.user.id === session.user.id;
   const currentMonth = getCurrentMonthPeriod();
   const currentMonthLabel = getMonthLabel(currentMonth.month, currentMonth.year);
   const primaryStats = buildPrimaryStats(payload.displayMode, payload.user);
@@ -190,7 +191,9 @@ export default async function UserProfilePage({
             <div className="max-w-2xl">
               <h2 className="text-2xl font-semibold [font-family:var(--font-heading)] sm:text-3xl">Overall progress</h2>
               <div className="mt-4 flex flex-wrap gap-2">
-                <span className={`status-chip ${profileStatusClasses(payload.user.monthlyStatus)}`}>{payload.user.monthlyStatus}</span>
+                <span className={`status-chip ${profileStatusClasses(payload.user.monthlyStatus)}`}>
+                  {formatMonthlyStatusLabel(payload.user.monthlyStatus)}
+                </span>
                 {payload.user.currentMonthTargetPct !== 100 ? (
                   <span className="status-chip bg-white text-ink/60">{payload.user.currentMonthTargetPct}% rule this month</span>
                 ) : null}
@@ -227,6 +230,12 @@ export default async function UserProfilePage({
             <SummaryCard key={card.label} label={card.label} value={card.value} />
           ))}
         </div>
+
+        {isOwnProfile ? (
+          <div className="mt-4 rounded-[24px] border border-black/5 bg-white/70 px-4 py-3 text-sm font-medium text-ink/70">
+            {payload.user.currentMonthPaceMessage}
+          </div>
+        ) : null}
       </section>
 
       {payload.canEditStartingWeight || payload.canManagePrivacy ? (
@@ -253,16 +262,16 @@ export default async function UserProfilePage({
         {payload.bmi ? <BmiMeter bmi={payload.bmi} /> : null}
         <section className="panel p-5 sm:p-6">
           <div className="mb-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-moss">Penalty summary</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-moss">Accountability summary</p>
             <h2 className="mt-1.5 text-2xl font-semibold [font-family:var(--font-heading)]">Accountability</h2>
           </div>
 
           <div className="grid gap-3 md:grid-cols-[1.15fr_0.85fr]">
             <div className="rounded-[28px] bg-sand/70 p-5">
-              <p className="text-xs uppercase tracking-[0.18em] text-ink/45">Total RM owed</p>
+              <p className="text-xs uppercase tracking-[0.18em] text-ink/45">Accountability balance</p>
               <p className="mt-3 text-3xl font-semibold [font-family:var(--font-heading)]">{formatRm(payload.user.totalRmOwed)}</p>
             </div>
-            <SummaryCard label="Missed-month penalty" value={formatRm(payload.user.monthlyPenaltyRm)} />
+            <SummaryCard label="Missed-month amount" value={formatRm(payload.user.monthlyPenaltyRm)} />
           </div>
         </section>
         <WeightTable mode={payload.displayMode} rows={payload.history} />
@@ -297,11 +306,11 @@ export default async function UserProfilePage({
                 value={`${exemptMonths}`}
               />
               <SectionStatCard
-                label="Penalty months"
+                label="Missed months"
                 value={`${penaltyMonths}`}
               />
               <SectionStatCard
-                label="Penalty total"
+                label="Accountability total"
                 value={formatRm(totalPenaltyRm)}
               />
             </div>
@@ -313,7 +322,7 @@ export default async function UserProfilePage({
                     <div>
                       <p className="font-semibold text-ink">{getMonthLabel(result.month, result.year)}</p>
                     </div>
-                    <span className={`status-chip ${profileStatusClasses(result.status)}`}>{result.status}</span>
+                    <span className={`status-chip ${profileStatusClasses(result.status)}`}>{formatMonthlyStatusLabel(result.status)}</span>
                   </div>
 
                   <div className="mt-4 grid grid-cols-2 gap-3">
@@ -334,11 +343,11 @@ export default async function UserProfilePage({
                       <p className="mt-1 font-semibold text-ink">{formatWeight(result.weightLoss)}</p>
                     </div>
                     <div className="panel-muted p-3">
-                      <p className="text-xs uppercase tracking-[0.16em] text-ink/45">Required</p>
+                      <p className="text-xs uppercase tracking-[0.16em] text-ink/45">Target</p>
                       <p className="mt-1 font-semibold text-ink">{formatWeight(result.requiredLossKg)}</p>
                     </div>
                     <div className="panel-muted p-3">
-                      <p className="text-xs uppercase tracking-[0.16em] text-ink/45">Penalty</p>
+                      <p className="text-xs uppercase tracking-[0.16em] text-ink/45">Balance</p>
                       <p className="mt-1 font-semibold text-ink">
                         {result.penaltyExempt ? "Exempt" : result.penaltyAmountRm > 0 ? formatRm(result.penaltyAmountRm) : "None"}
                       </p>
@@ -360,8 +369,8 @@ export default async function UserProfilePage({
                     <th className="px-4 py-3 font-medium">Start</th>
                     <th className="px-4 py-3 font-medium">End</th>
                     <th className="px-4 py-3 font-medium">Loss</th>
-                    <th className="px-4 py-3 font-medium">Required</th>
-                    <th className="px-4 py-3 font-medium">Penalty</th>
+                    <th className="px-4 py-3 font-medium">Target</th>
+                    <th className="px-4 py-3 font-medium">Balance</th>
                     <th className="px-4 py-3 font-medium">Status</th>
                   </tr>
                 </thead>
@@ -383,7 +392,7 @@ export default async function UserProfilePage({
                         {result.penaltyExempt ? "Exempt" : result.penaltyAmountRm > 0 ? formatRm(result.penaltyAmountRm) : "None"}
                       </td>
                       <td className="px-4 py-4">
-                        <span className={`status-chip ${profileStatusClasses(result.status)}`}>{result.status}</span>
+                        <span className={`status-chip ${profileStatusClasses(result.status)}`}>{formatMonthlyStatusLabel(result.status)}</span>
                         {result.statusDetail ? <p className="mt-2 max-w-[18rem] text-xs font-medium leading-5 text-ink/55">{result.statusDetail}</p> : null}
                       </td>
                     </tr>

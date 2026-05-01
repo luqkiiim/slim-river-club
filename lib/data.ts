@@ -8,6 +8,7 @@ import {
   calculateBmi,
   calculateLossProgress,
   calculateProgress,
+  clamp,
   didReachTargetLossByDate,
   formatDate,
   formatWeight,
@@ -26,7 +27,6 @@ import {
   getTotalKgLostOnOrBefore,
   isLatestWeightPersonalBest,
   roundTo,
-  sortByLeaderboardMetric,
   type ResolvedWeightEntry,
 } from "@/lib/weight-utils";
 import type {
@@ -35,8 +35,8 @@ import type {
   BmiSummary,
   DashboardUserSummary,
   GroupSummary,
-  LeaderboardRow,
   MonthPolicySummary,
+  MonthlyPaceStatus,
   ProfileHistoryRow,
   ProfileMonthlyResult,
   TrackingDisplayMode,
@@ -59,6 +59,7 @@ type UserWithRelations = Prisma.UserGetPayload<{
 type ParticipantUserWithRelations = UserWithRelations;
 type MonthPolicyRecord = Pick<MonthPolicySummary, "month" | "year" | "requiredTargetPct">;
 type MonthPolicyMap = Map<string, MonthPolicyRecord>;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 interface TrackingState {
   displayMode: TrackingDisplayMode;
@@ -109,6 +110,87 @@ function buildMonthPolicyMap(policies: MonthPolicyRecord[]) {
 
 function getTargetRatioPctForPeriod(policies: MonthPolicyMap, period: { month: number; year: number }) {
   return policies.get(buildMonthPolicyKey(period.month, period.year))?.requiredTargetPct ?? 100;
+}
+
+function getDaysInPeriod(period: { month: number; year: number }) {
+  return new Date(Date.UTC(period.year, period.month, 0)).getUTCDate();
+}
+
+function getElapsedDaysInPeriod(period: { start: Date; end: Date; month: number; year: number }, now = new Date()) {
+  const daysInPeriod = getDaysInPeriod(period);
+  const boundedTime = clamp(now.getTime(), period.start.getTime(), period.end.getTime());
+  const elapsedDays = Math.floor((boundedTime - period.start.getTime()) / MS_PER_DAY) + 1;
+
+  return clamp(elapsedDays, 1, daysInPeriod);
+}
+
+function buildCurrentMonthPace({
+  currentMonthLoss,
+  currentMonthRequiredLossKg,
+  currentMonthEntriesCount,
+  currentMonth,
+  monthlyStatus,
+}: {
+  currentMonthLoss: number;
+  currentMonthRequiredLossKg: number;
+  currentMonthEntriesCount: number;
+  currentMonth: ReturnType<typeof getCurrentMonthPeriod>;
+  monthlyStatus: DashboardUserSummary["monthlyStatus"];
+}): {
+  currentMonthRemainingLossKg: number;
+  currentMonthPaceStatus: MonthlyPaceStatus;
+  currentMonthPaceMessage: string;
+} {
+  const safeCurrentMonthLoss = Math.max(currentMonthLoss, 0);
+  const currentMonthRemainingLossKg = roundTo(Math.max(currentMonthRequiredLossKg - safeCurrentMonthLoss, 0), 2);
+
+  if (monthlyStatus === "EXEMPT") {
+    return {
+      currentMonthRemainingLossKg: 0,
+      currentMonthPaceStatus: "EXEMPT",
+      currentMonthPaceMessage: "This month is exempt. Keep logging progress.",
+    };
+  }
+
+  if (monthlyStatus === "GOAL REACHED" || monthlyStatus === "PASSED" || currentMonthRemainingLossKg <= 0) {
+    return {
+      currentMonthRemainingLossKg: 0,
+      currentMonthPaceStatus: "COMPLETE",
+      currentMonthPaceMessage: "You have completed this month's target.",
+    };
+  }
+
+  if (currentMonthEntriesCount === 0) {
+    return {
+      currentMonthRemainingLossKg,
+      currentMonthPaceStatus: "NO_UPDATE",
+      currentMonthPaceMessage: "No update yet this month. Log your latest progress to see what remains.",
+    };
+  }
+
+  const daysInPeriod = getDaysInPeriod(currentMonth);
+  const elapsedDays = getElapsedDaysInPeriod(currentMonth);
+  const remainingDays = Math.max(daysInPeriod - elapsedDays + 1, 1);
+  const remainingWeeks = Math.max(remainingDays / 7, 1 / 7);
+  const weeklyPaceKg = roundTo(currentMonthRemainingLossKg / remainingWeeks, 2);
+  const expectedLossByNow = roundTo(currentMonthRequiredLossKg * (elapsedDays / daysInPeriod), 2);
+  const paceGap = roundTo(expectedLossByNow - safeCurrentMonthLoss, 2);
+  const currentMonthPaceStatus: MonthlyPaceStatus =
+    paceGap <= 0.1 ? "ON_TRACK" : paceGap <= 0.5 ? "SLIGHTLY_BEHIND" : "BEHIND";
+
+  if (currentMonthPaceStatus === "ON_TRACK") {
+    return {
+      currentMonthRemainingLossKg,
+      currentMonthPaceStatus,
+      currentMonthPaceMessage: `You are on pace. ${formatWeight(currentMonthRemainingLossKg)} left this month, about ${formatWeight(weeklyPaceKg)} per week from here.`,
+    };
+  }
+
+  return {
+    currentMonthRemainingLossKg,
+    currentMonthPaceStatus,
+    currentMonthPaceMessage: `${formatWeight(currentMonthRemainingLossKg)} left this month. Aim for about ${formatWeight(weeklyPaceKg)} per week from here.`,
+  };
 }
 
 function isPenaltyExemptPeriod(challengeStartDate: Date, period: { month: number; year: number }) {
@@ -257,6 +339,13 @@ function buildDashboardUser(
   const monthlyStatus = isPenaltyExemptPeriod(tracking.challengeStartDate, currentMonth)
     ? "EXEMPT"
     : getMonthlyStatus(tracking.goalReached, tracking.currentMonthLoss, currentMonthRequiredLossKg);
+  const currentMonthPace = buildCurrentMonthPace({
+    currentMonthLoss: tracking.currentMonthLoss,
+    currentMonthRequiredLossKg,
+    currentMonthEntriesCount: currentMonthEntries.length,
+    currentMonth,
+    monthlyStatus,
+  });
 
   return {
     id: user.id,
@@ -282,29 +371,38 @@ function buildDashboardUser(
     monthlyStatus,
     currentMonthLoss: tracking.currentMonthLoss,
     currentMonthEntryCount: currentMonthEntries.length,
+    ...currentMonthPace,
     personalBest: isLatestWeightPersonalBest(tracking.timeline),
     needsStartingWeight: user.isPrivate && user.startWeight === null,
     lastLoggedAt: user.weightEntries.at(-1) ? formatDate(user.weightEntries.at(-1)!.date) : undefined,
   };
 }
 
-function buildLeaderboard(users: DashboardUserSummary[], metric: "kgLost" | "progressPct"): LeaderboardRow[] {
-  return [...users]
-    .sort((a, b) => sortByLeaderboardMetric(a, b, metric))
-    .map((user) => ({
-      userId: user.id,
-      name: user.name,
-      metric: user[metric],
-      valueLabel: metric === "kgLost" ? formatWeight(user[metric]) : `${user[metric]}%`,
-    }));
-}
-
 function buildGroupSummary(users: DashboardUserSummary[]): GroupSummary {
+  const usersWithMonthlyTargets = users.filter((user) => user.monthlyStatus !== "EXEMPT");
+  const currentMonthRequiredLossKg = roundTo(
+    usersWithMonthlyTargets.reduce((total, user) => total + user.currentMonthRequiredLossKg, 0),
+    2,
+  );
+  const currentMonthLoss = roundTo(
+    usersWithMonthlyTargets.reduce(
+      (total, user) => total + clamp(user.currentMonthLoss, 0, user.currentMonthRequiredLossKg),
+      0,
+    ),
+    2,
+  );
+  const currentMonthProgressPct =
+    currentMonthRequiredLossKg > 0 ? roundTo(clamp((currentMonthLoss / currentMonthRequiredLossKg) * 100, 0, 100), 0) : 100;
+
   return {
     totalMembers: users.length,
     goalReachedCount: users.filter((user) => user.goalReached).length,
     totalKgLost: roundTo(users.reduce((total, user) => total + user.kgLost, 0), 2),
     totalRmOwed: users.reduce((total, user) => total + user.totalRmOwed, 0),
+    activeLoggersThisMonth: users.filter((user) => user.currentMonthEntryCount > 0).length,
+    currentMonthLoss,
+    currentMonthRequiredLossKg,
+    currentMonthProgressPct,
   };
 }
 
@@ -521,8 +619,6 @@ export async function getDashboardPayload(viewerUserId?: string) {
   return {
     users: summaries,
     groupSummary: buildGroupSummary(summaries),
-    lossLeaderboard: buildLeaderboard(summaries, "kgLost"),
-    progressLeaderboard: buildLeaderboard(summaries, "progressPct"),
     currentMonthLabel: getMonthLabel(currentMonth.month, currentMonth.year),
   };
 }
@@ -606,8 +702,8 @@ export async function getUserProfilePayload(userId: string, viewerUserId: string
       statusDetail: result.penaltyExempt
         ? `Started on ${formatDate(tracking.challengeStartDate)}`
         : result.targetRatioPct !== 100
-          ? `${result.targetRatioPct}% month required ${formatWeight(result.requiredLossKg)}`
-          : `Required ${formatWeight(result.requiredLossKg)}`,
+          ? `${result.targetRatioPct}% month target ${formatWeight(result.requiredLossKg)}`
+          : `Target ${formatWeight(result.requiredLossKg)}`,
     };
   });
 
@@ -639,6 +735,7 @@ export async function getAdminPayload() {
   const monthPolicies = await prisma.monthPolicy.findMany({
     orderBy: [{ year: "asc" }, { month: "asc" }],
   });
+  const monthPolicyMap = buildMonthPolicyMap(monthPolicies);
 
   const users = await prisma.user.findMany({
     include: {
@@ -676,6 +773,7 @@ export async function getAdminPayload() {
         totalKgLost: 0,
         progressPct: 0,
         totalRmOwed: user.totalRmOwed,
+        currentMonthPaceMessage: null,
         claimCode: user.claimCode,
         needsStartingWeight: false,
         adminCanTogglePrivacy: false,
@@ -683,6 +781,7 @@ export async function getAdminPayload() {
     }
 
     const tracking = buildTrackingState(user);
+    const dashboardSummary = buildDashboardUser(user, monthPolicyMap);
 
     return {
       id: user.id,
@@ -704,6 +803,7 @@ export async function getAdminPayload() {
       totalKgLost: tracking.kgLost,
       progressPct: tracking.progressPct,
       totalRmOwed: user.totalRmOwed,
+      currentMonthPaceMessage: dashboardSummary.currentMonthPaceMessage,
       claimCode: user.claimCode,
       needsStartingWeight: user.isPrivate && user.startWeight === null,
       adminCanTogglePrivacy: user.passwordHash === null,

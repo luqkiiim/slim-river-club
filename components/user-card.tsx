@@ -1,12 +1,13 @@
 import Link from "next/link";
 
 import { ProgressBar } from "@/components/progress-bar";
-import { formatWeight } from "@/lib/weight-utils";
+import { formatMonthlyStatusLabel, formatWeight } from "@/lib/weight-utils";
 import type { DashboardUserSummary, MonthlyStatus } from "@/types/app";
 
 interface UserCardProps {
   user: DashboardUserSummary;
   currentMonthLabel: string;
+  isCurrentUser?: boolean;
 }
 
 function statusClasses(status: MonthlyStatus) {
@@ -47,14 +48,14 @@ function buildMonthlyProgressContent(user: DashboardUserSummary, currentMonthLab
         value: user.currentMonthEntryCount > 0 ? formatWeight(user.currentMonthLoss) : "No updates yet",
       },
       {
-        label: "Required",
+        label: "Target",
         value: user.monthlyStatus === "EXEMPT" ? "Exempt" : formatWeight(user.currentMonthRequiredLossKg),
       },
     ] as const,
   };
 }
 
-export function UserCard({ user, currentMonthLabel }: UserCardProps) {
+export function UserCard({ user, currentMonthLabel, isCurrentUser = false }: UserCardProps) {
   const progressContent = buildMonthlyProgressContent(user, currentMonthLabel);
   const targetText =
     user.displayMode === "weight" && user.targetWeight !== null
@@ -83,17 +84,17 @@ export function UserCard({ user, currentMonthLabel }: UserCardProps) {
             ) : null}
             {user.personalBest ? (
               <span className="rounded-full bg-[#f8d7a7] px-2.5 py-1 text-[11px] font-semibold text-[#8c5b18]">
-                New Personal Best
+                Personal Best
               </span>
             ) : null}
           </div>
         </div>
-        <span className={`status-chip ${statusClasses(user.monthlyStatus)}`}>{user.monthlyStatus}</span>
+        <span className={`status-chip ${statusClasses(user.monthlyStatus)}`}>{formatMonthlyStatusLabel(user.monthlyStatus)}</span>
       </div>
 
       <ProgressBar title={progressContent.title} progressPct={progressContent.progressPct} metrics={progressContent.metrics} />
 
-      <div className="mt-4 grid grid-cols-2 gap-2.5 text-sm">
+      <div className="mt-4 hidden grid-cols-2 gap-2.5 text-sm sm:grid">
         <div className="panel-muted p-3">
           <p className="text-xs uppercase tracking-[0.16em] text-ink/45">
             {user.displayMode === "weight" ? "Current" : "Total lost"}
@@ -118,10 +119,15 @@ export function UserCard({ user, currentMonthLabel }: UserCardProps) {
 
       <div className="mt-4 flex flex-col gap-2.5 border-t border-black/5 pt-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink/60">
-          <p>{targetText}</p>
-          <span className="hidden text-ink/35 sm:inline">•</span>
+          <p className="hidden sm:block">{targetText}</p>
+          <span className="hidden text-ink/35 sm:inline">|</span>
           <p>{lastLoggedText}</p>
-          {user.currentMonthTargetPct !== 100 ? <p>{user.currentMonthTargetPct}% month rule</p> : null}
+          {isCurrentUser && user.currentMonthRemainingLossKg > 0 ? (
+            <p className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-moss">
+              {formatWeight(user.currentMonthRemainingLossKg)} left
+            </p>
+          ) : null}
+          {user.currentMonthTargetPct !== 100 ? <p className="hidden sm:block">{user.currentMonthTargetPct}% month rule</p> : null}
         </div>
         <Link className="text-sm font-semibold text-moss underline-offset-4 hover:underline" href={`/users/${user.id}`}>
           View profile

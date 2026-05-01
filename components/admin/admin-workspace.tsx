@@ -233,6 +233,7 @@ function ParticipantSummaryRow({
   description,
   label,
   metrics,
+  note,
   onManage,
 }: {
   children?: ReactNode;
@@ -240,6 +241,7 @@ function ParticipantSummaryRow({
   description: string;
   label: ReactNode;
   metrics: Array<{ detail: string; label: string; value: string }>;
+  note?: ReactNode;
   onManage: () => void;
 }) {
   return (
@@ -271,6 +273,8 @@ function ParticipantSummaryRow({
           {children}
         </div>
       </div>
+
+      {note ? <div className="mt-3 rounded-2xl bg-sand/45 px-4 py-3 text-sm font-medium text-ink/65">{note}</div> : null}
     </article>
   );
 }
@@ -333,6 +337,7 @@ function ParticipantRow({
         { label: targetLabel, value: targetValue, detail: targetDetail },
         { label: "Rules", value: rulesValue, detail: rulesDetail },
       ]}
+      note={user.currentMonthPaceMessage ? <>Participant sees: {user.currentMonthPaceMessage}</> : undefined}
       onManage={onManage}
     >
       <ActionMenu
@@ -363,7 +368,7 @@ function AdminAccessRow({
       label={<h3 className="truncate text-xl font-semibold [font-family:var(--font-heading)] text-ink">{user.name}</h3>}
       metrics={[
         { label: "Access", value: user.isAdmin ? "Admin" : "Member", detail: "Role can still be changed" },
-        { label: "Tracking", value: "Excluded", detail: "No leaderboards or penalties" },
+        { label: "Tracking", value: "Excluded", detail: "No participant accountability rules" },
         { label: "Status", value: "Workspace only", detail: "Management account" },
       ]}
       onManage={onManage}
@@ -410,6 +415,7 @@ function ClaimRow({
           detail: user.isPrivate ? "Use private change logs" : "Use public weigh-ins",
         },
       ]}
+      note={user.currentMonthPaceMessage ? <>Participant will see after claiming: {user.currentMonthPaceMessage}</> : undefined}
       onManage={onManage}
     >
       <ActionMenu
@@ -606,6 +612,15 @@ function ParticipantEditor({
           title="Claim code"
         >
           <CopyValueField buttonLabel="Copy code" value={user.claimCode} />
+        </EditorSection>
+      ) : null}
+
+      {user.currentMonthPaceMessage ? (
+        <EditorSection
+          description="This mirrors the private pace guidance shown to the participant."
+          title="Participant message"
+        >
+          <div className="rounded-2xl bg-white/80 px-4 py-3 text-sm font-medium text-ink/70">{user.currentMonthPaceMessage}</div>
         </EditorSection>
       ) : null}
 

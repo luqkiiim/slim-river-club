@@ -77,6 +77,22 @@ export function formatRm(amount: number) {
   return `RM${amount}`;
 }
 
+export function formatMonthlyStatusLabel(status: MonthlyStatus) {
+  if (status === "NEEDS MORE LOSS") {
+    return "In Progress";
+  }
+
+  if (status === "GOAL REACHED") {
+    return "Goal Reached";
+  }
+
+  if (status === "PASSED") {
+    return "Complete";
+  }
+
+  return "Exempt";
+}
+
 export function formatBmi(value: number) {
   return roundTo(value, 1).toFixed(1);
 }
