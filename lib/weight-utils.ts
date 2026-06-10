@@ -241,11 +241,11 @@ export function getMonthLabel(month: number, year: number) {
 }
 
 export function getCurrentMonthPeriod(now = new Date()): UtcMonthPeriod {
-  const year = now.getUTCFullYear();
-  const monthIndex = now.getUTCMonth();
+  const { year, month } = getDatePartsInAppTimeZone(now);
+  const monthIndex = month - 1;
 
   return {
-    month: monthIndex + 1,
+    month,
     year,
     start: new Date(Date.UTC(year, monthIndex, 1, 0, 0, 0)),
     end: new Date(Date.UTC(year, monthIndex + 1, 0, 23, 59, 59, 999)),
