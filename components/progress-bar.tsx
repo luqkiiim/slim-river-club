@@ -15,7 +15,8 @@ export function ProgressBar({ title, progressPct, metrics }: ProgressBarProps) {
   const resolvedMetrics = metrics ?? [];
   const clampedProgressPct = Math.min(Math.max(progressPct, 0), 100);
   const hasMetrics = resolvedMetrics.length > 0;
-  const metricColumnsClass = resolvedMetrics.length <= 2 ? "grid-cols-2" : "grid-cols-3";
+  const metricColumnsClass =
+    resolvedMetrics.length <= 2 ? "grid-cols-2" : resolvedMetrics.length === 3 ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-4";
 
   return (
     <div className={hasMetrics ? "space-y-2.5" : "space-y-3"}>

@@ -55,6 +55,16 @@ function buildMonthlyProgressContent(user: DashboardUserSummary, currentMonthLab
   };
 }
 
+function formatCurrentPaceBadge(user: DashboardUserSummary) {
+  if (user.currentMonthPaceUnit === "days") {
+    const daysLabel = user.currentMonthDaysRemaining === 1 ? "day" : "days";
+
+    return `${formatWeight(user.currentMonthPaceAmountKg)} in ${user.currentMonthDaysRemaining} ${daysLabel}`;
+  }
+
+  return `${formatWeight(user.currentMonthPaceAmountKg)}/week`;
+}
+
 export function UserCard({ user, currentMonthLabel, isCurrentUser = false }: UserCardProps) {
   const progressContent = buildMonthlyProgressContent(user, currentMonthLabel);
   const targetText =
@@ -124,7 +134,7 @@ export function UserCard({ user, currentMonthLabel, isCurrentUser = false }: Use
           <p>{lastLoggedText}</p>
           {isCurrentUser && user.currentMonthRemainingLossKg > 0 ? (
             <p className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-moss">
-              {formatWeight(user.currentMonthRemainingLossKg)} left
+              {formatCurrentPaceBadge(user)}
             </p>
           ) : null}
           {user.currentMonthTargetPct !== 100 ? <p className="hidden sm:block">{user.currentMonthTargetPct}% month rule</p> : null}

@@ -138,15 +138,28 @@ function buildCurrentMonthPace({
   monthlyStatus: DashboardUserSummary["monthlyStatus"];
 }): {
   currentMonthRemainingLossKg: number;
+  currentMonthPaceAmountKg: number;
+  currentMonthPaceUnit: "week" | "days";
+  currentMonthDaysRemaining: number;
   currentMonthPaceStatus: MonthlyPaceStatus;
   currentMonthPaceMessage: string;
 } {
   const safeCurrentMonthLoss = Math.max(currentMonthLoss, 0);
   const currentMonthRemainingLossKg = roundTo(Math.max(currentMonthRequiredLossKg - safeCurrentMonthLoss, 0), 2);
+  const daysInPeriod = getDaysInPeriod(currentMonth);
+  const elapsedDays = getElapsedDaysInPeriod(currentMonth);
+  const remainingDays = Math.max(daysInPeriod - elapsedDays + 1, 1);
+  const paceUnit = remainingDays < 7 ? "days" : "week";
+  const remainingWeeks = Math.max(remainingDays / 7, 1 / 7);
+  const weeklyPaceKg = roundTo(currentMonthRemainingLossKg / remainingWeeks, 2);
+  const paceAmountKg = paceUnit === "days" ? currentMonthRemainingLossKg : weeklyPaceKg;
 
   if (monthlyStatus === "EXEMPT") {
     return {
       currentMonthRemainingLossKg: 0,
+      currentMonthPaceAmountKg: 0,
+      currentMonthPaceUnit: paceUnit,
+      currentMonthDaysRemaining: remainingDays,
       currentMonthPaceStatus: "EXEMPT",
       currentMonthPaceMessage: "This month is exempt. Keep logging progress.",
     };
@@ -155,6 +168,9 @@ function buildCurrentMonthPace({
   if (monthlyStatus === "GOAL REACHED" || monthlyStatus === "PASSED" || currentMonthRemainingLossKg <= 0) {
     return {
       currentMonthRemainingLossKg: 0,
+      currentMonthPaceAmountKg: 0,
+      currentMonthPaceUnit: paceUnit,
+      currentMonthDaysRemaining: remainingDays,
       currentMonthPaceStatus: "COMPLETE",
       currentMonthPaceMessage: "You have completed this month's target.",
     };
@@ -163,24 +179,37 @@ function buildCurrentMonthPace({
   if (currentMonthEntriesCount === 0) {
     return {
       currentMonthRemainingLossKg,
+      currentMonthPaceAmountKg: paceAmountKg,
+      currentMonthPaceUnit: paceUnit,
+      currentMonthDaysRemaining: remainingDays,
       currentMonthPaceStatus: "NO_UPDATE",
       currentMonthPaceMessage: "No update yet this month. Log your latest progress to see what remains.",
     };
   }
 
-  const daysInPeriod = getDaysInPeriod(currentMonth);
-  const elapsedDays = getElapsedDaysInPeriod(currentMonth);
-  const remainingDays = Math.max(daysInPeriod - elapsedDays + 1, 1);
-  const remainingWeeks = Math.max(remainingDays / 7, 1 / 7);
-  const weeklyPaceKg = roundTo(currentMonthRemainingLossKg / remainingWeeks, 2);
   const expectedLossByNow = roundTo(currentMonthRequiredLossKg * (elapsedDays / daysInPeriod), 2);
   const paceGap = roundTo(expectedLossByNow - safeCurrentMonthLoss, 2);
   const currentMonthPaceStatus: MonthlyPaceStatus =
     paceGap <= 0.1 ? "ON_TRACK" : paceGap <= 0.5 ? "SLIGHTLY_BEHIND" : "BEHIND";
+  const remainingDaysLabel = remainingDays === 1 ? "day" : "days";
+
+  if (paceUnit === "days") {
+    return {
+      currentMonthRemainingLossKg,
+      currentMonthPaceAmountKg: paceAmountKg,
+      currentMonthPaceUnit: paceUnit,
+      currentMonthDaysRemaining: remainingDays,
+      currentMonthPaceStatus,
+      currentMonthPaceMessage: `${formatWeight(currentMonthRemainingLossKg)} left in ${remainingDays} ${remainingDaysLabel}.`,
+    };
+  }
 
   if (currentMonthPaceStatus === "ON_TRACK") {
     return {
       currentMonthRemainingLossKg,
+      currentMonthPaceAmountKg: paceAmountKg,
+      currentMonthPaceUnit: paceUnit,
+      currentMonthDaysRemaining: remainingDays,
       currentMonthPaceStatus,
       currentMonthPaceMessage: `You are on pace. ${formatWeight(currentMonthRemainingLossKg)} left this month, about ${formatWeight(weeklyPaceKg)} per week from here.`,
     };
@@ -188,6 +217,9 @@ function buildCurrentMonthPace({
 
   return {
     currentMonthRemainingLossKg,
+    currentMonthPaceAmountKg: paceAmountKg,
+    currentMonthPaceUnit: paceUnit,
+    currentMonthDaysRemaining: remainingDays,
     currentMonthPaceStatus,
     currentMonthPaceMessage: `${formatWeight(currentMonthRemainingLossKg)} left this month. Aim for about ${formatWeight(weeklyPaceKg)} per week from here.`,
   };

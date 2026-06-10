@@ -43,6 +43,9 @@ export interface DashboardUserSummary {
   currentMonthLoss: number;
   currentMonthEntryCount: number;
   currentMonthRemainingLossKg: number;
+  currentMonthPaceAmountKg: number;
+  currentMonthPaceUnit: "week" | "days";
+  currentMonthDaysRemaining: number;
   currentMonthPaceStatus: MonthlyPaceStatus;
   currentMonthPaceMessage: string;
   personalBest: boolean;

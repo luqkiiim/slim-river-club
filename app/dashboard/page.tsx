@@ -57,7 +57,25 @@ function paceStatusClasses(status: MonthlyPaceStatus) {
   return "bg-blush/15 text-[#8f4a36]";
 }
 
+function getPaceMetric(user: DashboardUserSummary) {
+  if (user.currentMonthPaceUnit === "days") {
+    const daysLabel = user.currentMonthDaysRemaining === 1 ? "day" : "days";
+
+    return {
+      label: "Final stretch",
+      value: `${formatWeight(user.currentMonthPaceAmountKg)} in ${user.currentMonthDaysRemaining} ${daysLabel}`,
+    };
+  }
+
+  return {
+    label: "Weekly pace",
+    value: `${formatWeight(user.currentMonthPaceAmountKg)}/week`,
+  };
+}
+
 function MyMonthPanel({ user, currentMonthLabel }: { user: DashboardUserSummary; currentMonthLabel: string }) {
+  const paceMetric = getPaceMetric(user);
+
   return (
     <section className="panel mb-5 p-4 sm:p-5">
       <div className="mb-4 flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between">
@@ -86,6 +104,7 @@ function MyMonthPanel({ user, currentMonthLabel }: { user: DashboardUserSummary;
             label: "Remaining",
             value: formatWeight(user.currentMonthRemainingLossKg),
           },
+          paceMetric,
         ]}
       />
 
