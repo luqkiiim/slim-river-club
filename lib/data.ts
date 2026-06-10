@@ -659,6 +659,7 @@ function buildHistoryRows(displayMode: TrackingDisplayMode, timeline: ResolvedWe
   if (displayMode === "weight") {
     return [...timeline]
       .filter((entry) => entry.resolvedWeight !== null)
+      .reverse()
       .map((entry) => ({
         id: entry.id,
         date: formatDate(entry.date),
