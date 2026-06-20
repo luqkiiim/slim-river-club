@@ -227,6 +227,33 @@ function RosterMetric({
   );
 }
 
+function buildAdminPaceMetric(user: AdminUserSummary) {
+  if (
+    user.currentMonthPaceAmountKg === null ||
+    user.currentMonthPaceUnit === null ||
+    user.currentMonthDaysRemaining === null ||
+    user.currentMonthRemainingLossKg === null
+  ) {
+    return null;
+  }
+
+  if (user.currentMonthPaceUnit === "days") {
+    const daysLabel = user.currentMonthDaysRemaining === 1 ? "day" : "days";
+
+    return {
+      label: "Final stretch",
+      value: `${formatWeight(user.currentMonthPaceAmountKg)} in ${user.currentMonthDaysRemaining} ${daysLabel}`,
+      detail: user.currentMonthPaceMessage ?? "Participant pace",
+    };
+  }
+
+  return {
+    label: "Weekly pace",
+    value: `${formatWeight(user.currentMonthPaceAmountKg)}/week`,
+    detail: `${formatWeight(user.currentMonthRemainingLossKg)} left this month`,
+  };
+}
+
 function ParticipantSummaryRow({
   children,
   chips,
@@ -255,7 +282,7 @@ function ParticipantSummaryRow({
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {metrics.map((metric) => (
             <RosterMetric
               key={metric.label}
@@ -320,6 +347,7 @@ function ParticipantRow({
   const targetDetail = user.isPrivate ? "Private mode" : `${formatWeight(user.totalKgLost)} lost so far`;
   const rulesValue = `${formatWeight(user.monthlyLossTargetKg)} / mo`;
   const rulesDetail = `${formatRm(user.monthlyPenaltyRm)} if missed`;
+  const paceMetric = buildAdminPaceMetric(user);
 
   return (
     <ParticipantSummaryRow
@@ -336,6 +364,7 @@ function ParticipantRow({
         { label: currentLabel, value: currentValue, detail: currentDetail },
         { label: targetLabel, value: targetValue, detail: targetDetail },
         { label: "Rules", value: rulesValue, detail: rulesDetail },
+        ...(paceMetric ? [paceMetric] : []),
       ]}
       note={user.currentMonthPaceMessage ? <>Participant sees: {user.currentMonthPaceMessage}</> : undefined}
       onManage={onManage}
@@ -394,6 +423,7 @@ function ClaimRow({
   const challengeStart = user.challengeStartDateIso
     ? formatDate(new Date(user.challengeStartDateIso))
     : "Not set";
+  const paceMetric = buildAdminPaceMetric(user);
 
   return (
     <ParticipantSummaryRow
@@ -414,6 +444,7 @@ function ClaimRow({
           value: user.needsStartingWeight ? "Baseline pending" : "Ready",
           detail: user.isPrivate ? "Use private change logs" : "Use public weigh-ins",
         },
+        ...(paceMetric ? [paceMetric] : []),
       ]}
       note={user.currentMonthPaceMessage ? <>Participant will see after claiming: {user.currentMonthPaceMessage}</> : undefined}
       onManage={onManage}
@@ -574,6 +605,7 @@ function ParticipantEditor({
     : user.targetWeight !== null
       ? formatWeight(user.targetWeight)
       : "Not set";
+  const paceMetric = buildAdminPaceMetric(user);
 
   return (
     <div className="space-y-6">
@@ -599,6 +631,13 @@ function ParticipantEditor({
           label="Monthly rule"
           value={`${formatWeight(user.monthlyLossTargetKg)} target`}
         />
+        {paceMetric ? (
+          <SummaryTile
+            detail={paceMetric.detail}
+            label={paceMetric.label}
+            value={paceMetric.value}
+          />
+        ) : null}
         <SummaryTile
           detail={user.needsStartingWeight ? "Starting weight still needed" : "Ready for normal tracking"}
           label="Challenge start"

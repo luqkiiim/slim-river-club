@@ -128,6 +128,10 @@ export interface AdminUserSummary {
   totalKgLost: number;
   progressPct: number;
   totalRmOwed: number;
+  currentMonthRemainingLossKg: number | null;
+  currentMonthPaceAmountKg: number | null;
+  currentMonthPaceUnit: "week" | "days" | null;
+  currentMonthDaysRemaining: number | null;
   currentMonthPaceMessage: string | null;
   claimCode: string | null;
   needsStartingWeight: boolean;
