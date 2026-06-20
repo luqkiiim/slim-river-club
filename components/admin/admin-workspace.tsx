@@ -1023,6 +1023,50 @@ function ParticipantEmptyState({
   );
 }
 
+function WeeklyPaceOverview({ users }: { users: AdminUserSummary[] }) {
+  const paceRows = users
+    .filter((user) => user.isParticipant)
+    .map((user) => ({ metric: buildAdminPaceMetric(user), user }))
+    .filter((row): row is { metric: NonNullable<ReturnType<typeof buildAdminPaceMetric>>; user: AdminUserSummary } => row.metric !== null);
+
+  if (paceRows.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="panel mb-6 p-5 sm:p-6">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-moss">Admin pace view</p>
+          <h2 className="mt-1 text-xl font-semibold [font-family:var(--font-heading)] text-ink">Weekly pace</h2>
+          <p className="mt-1 text-sm text-ink/65">
+            How much each tracked participant needs from here to finish the current month.
+          </p>
+        </div>
+        <span className="status-chip bg-white text-ink/60">{paceRows.length} tracked</span>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {paceRows.map(({ metric, user }) => (
+          <article key={user.id} className="rounded-[24px] border border-black/5 bg-white/85 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <p className="font-semibold text-ink">{user.name}</p>
+                <p className="mt-1 text-xs uppercase tracking-[0.16em] text-ink/45">{metric.label}</p>
+              </div>
+              <span className="rounded-full bg-sand px-2.5 py-1 text-[11px] font-semibold text-ink/65">
+                {user.hasLoginAccess ? "Active" : "Pending claim"}
+              </span>
+            </div>
+            <p className="mt-3 text-2xl font-semibold [font-family:var(--font-heading)] text-ink">{metric.value}</p>
+            <p className="mt-2 text-sm text-ink/60">{user.currentMonthPaceMessage ?? metric.detail}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function AdminWorkspace({
   entries,
   monthPolicies,
@@ -1104,6 +1148,8 @@ export function AdminWorkspace({
           value={formatRm(totalRmOwed)}
         />
       </section>
+
+      <WeeklyPaceOverview users={participants} />
 
       <div className="mb-6 inline-flex w-full flex-wrap gap-2 rounded-[28px] border border-black/5 bg-white/70 p-2 shadow-[0_10px_30px_rgba(31,42,31,0.04)] sm:w-auto">
         {[
