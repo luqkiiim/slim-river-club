@@ -119,20 +119,46 @@ function buildPrimaryStats(displayMode: "weight" | "loss", user: DashboardUserSu
   ];
 }
 
-function buildCurrentMonthPaceCard(user: DashboardUserSummary): InfoCardContent {
-  if (user.currentMonthPaceUnit === "days") {
-    const daysLabel = user.currentMonthDaysRemaining === 1 ? "day" : "days";
+function buildPaceSnapshotCards(user: DashboardUserSummary): InfoCardContent[] {
+  const paceCard =
+    user.currentMonthPaceUnit === "days"
+      ? (() => {
+          const daysLabel = user.currentMonthDaysRemaining === 1 ? "day" : "days";
 
-    return {
-      label: "Final stretch",
-      value: `${formatWeight(user.currentMonthPaceAmountKg)} in ${user.currentMonthDaysRemaining} ${daysLabel}`,
-    };
-  }
+          return {
+            label: "Final stretch",
+            value: `${formatWeight(user.currentMonthPaceAmountKg)} / ${user.currentMonthDaysRemaining} ${daysLabel}`,
+          };
+        })()
+      : {
+          label: "Weekly target",
+          value: `${formatWeight(user.currentMonthPaceAmountKg)} / week`,
+        };
 
-  return {
-    label: "Weekly pace",
-    value: `${formatWeight(user.currentMonthPaceAmountKg)}/week`,
-  };
+  return [
+    {
+      label: "Weight left",
+      value: formatWeight(user.currentMonthRemainingLossKg),
+    },
+    paceCard,
+  ];
+}
+
+function PaceSnapshot({ user }: { user: DashboardUserSummary }) {
+  const paceCards = buildPaceSnapshotCards(user);
+
+  return (
+    <div className="mt-4 rounded-[24px] border border-black/5 bg-white/70 p-3">
+      <div className="grid gap-3 sm:grid-cols-2">
+        {paceCards.map((card) => (
+          <div key={card.label} className="rounded-[18px] bg-white/80 px-4 py-3">
+            <p className="text-xs uppercase tracking-[0.16em] text-ink/45">{card.label}</p>
+            <p className="mt-1 text-xl font-semibold [font-family:var(--font-heading)] text-ink">{card.value}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function buildChallengeCards(displayMode: "weight" | "loss", user: DashboardUserSummary): InfoCardContent[] {
@@ -145,7 +171,6 @@ function buildChallengeCards(displayMode: "weight" | "loss", user: DashboardUser
       label: "This month target",
       value: formatWeight(user.currentMonthRequiredLossKg),
     },
-    buildCurrentMonthPaceCard(user),
     displayMode === "weight"
       ? {
           label: "Month-end target",
@@ -243,17 +268,13 @@ export default async function UserProfilePage({
           <h2 className="mt-1.5 text-2xl font-semibold [font-family:var(--font-heading)]">Rules for {currentMonthLabel}</h2>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 md:grid-cols-3">
           {challengeCards.map((card) => (
             <SummaryCard key={card.label} label={card.label} value={card.value} />
           ))}
         </div>
 
-        {canSeePaceGuidance ? (
-          <div className="mt-4 rounded-[24px] border border-black/5 bg-white/70 px-4 py-3 text-sm font-medium text-ink/70">
-            {payload.user.currentMonthPaceMessage}
-          </div>
-        ) : null}
+        {canSeePaceGuidance ? <PaceSnapshot user={payload.user} /> : null}
       </section>
 
       {payload.canEditStartingWeight || payload.canManagePrivacy ? (
