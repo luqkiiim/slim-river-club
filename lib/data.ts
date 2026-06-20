@@ -768,7 +768,6 @@ export async function getAdminPayload() {
   const monthPolicies = await prisma.monthPolicy.findMany({
     orderBy: [{ year: "asc" }, { month: "asc" }],
   });
-  const monthPolicyMap = buildMonthPolicyMap(monthPolicies);
 
   const users = await prisma.user.findMany({
     include: {
@@ -806,11 +805,6 @@ export async function getAdminPayload() {
         totalKgLost: 0,
         progressPct: 0,
         totalRmOwed: user.totalRmOwed,
-        currentMonthRemainingLossKg: null,
-        currentMonthPaceAmountKg: null,
-        currentMonthPaceUnit: null,
-        currentMonthDaysRemaining: null,
-        currentMonthPaceMessage: null,
         claimCode: user.claimCode,
         needsStartingWeight: false,
         adminCanTogglePrivacy: false,
@@ -818,7 +812,6 @@ export async function getAdminPayload() {
     }
 
     const tracking = buildTrackingState(user);
-    const dashboardSummary = buildDashboardUser(user, monthPolicyMap);
 
     return {
       id: user.id,
@@ -840,11 +833,6 @@ export async function getAdminPayload() {
       totalKgLost: tracking.kgLost,
       progressPct: tracking.progressPct,
       totalRmOwed: user.totalRmOwed,
-      currentMonthRemainingLossKg: dashboardSummary.currentMonthRemainingLossKg,
-      currentMonthPaceAmountKg: dashboardSummary.currentMonthPaceAmountKg,
-      currentMonthPaceUnit: dashboardSummary.currentMonthPaceUnit,
-      currentMonthDaysRemaining: dashboardSummary.currentMonthDaysRemaining,
-      currentMonthPaceMessage: dashboardSummary.currentMonthPaceMessage,
       claimCode: user.claimCode,
       needsStartingWeight: user.isPrivate && user.startWeight === null,
       adminCanTogglePrivacy: user.passwordHash === null,

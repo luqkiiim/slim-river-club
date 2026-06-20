@@ -119,6 +119,22 @@ function buildPrimaryStats(displayMode: "weight" | "loss", user: DashboardUserSu
   ];
 }
 
+function buildCurrentMonthPaceCard(user: DashboardUserSummary): InfoCardContent {
+  if (user.currentMonthPaceUnit === "days") {
+    const daysLabel = user.currentMonthDaysRemaining === 1 ? "day" : "days";
+
+    return {
+      label: "Final stretch",
+      value: `${formatWeight(user.currentMonthPaceAmountKg)} in ${user.currentMonthDaysRemaining} ${daysLabel}`,
+    };
+  }
+
+  return {
+    label: "Weekly pace",
+    value: `${formatWeight(user.currentMonthPaceAmountKg)}/week`,
+  };
+}
+
 function buildChallengeCards(displayMode: "weight" | "loss", user: DashboardUserSummary): InfoCardContent[] {
   return [
     {
@@ -129,6 +145,7 @@ function buildChallengeCards(displayMode: "weight" | "loss", user: DashboardUser
       label: "This month target",
       value: formatWeight(user.currentMonthRequiredLossKg),
     },
+    buildCurrentMonthPaceCard(user),
     displayMode === "weight"
       ? {
           label: "Month-end target",
@@ -155,6 +172,7 @@ export default async function UserProfilePage({
   }
 
   const isOwnProfile = payload.user.id === session.user.id;
+  const canSeePaceGuidance = isOwnProfile || session.user.isAdmin;
   const currentMonth = getCurrentMonthPeriod();
   const currentMonthLabel = getMonthLabel(currentMonth.month, currentMonth.year);
   const primaryStats = buildPrimaryStats(payload.displayMode, payload.user);
@@ -225,13 +243,13 @@ export default async function UserProfilePage({
           <h2 className="mt-1.5 text-2xl font-semibold [font-family:var(--font-heading)]">Rules for {currentMonthLabel}</h2>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {challengeCards.map((card) => (
             <SummaryCard key={card.label} label={card.label} value={card.value} />
           ))}
         </div>
 
-        {isOwnProfile ? (
+        {canSeePaceGuidance ? (
           <div className="mt-4 rounded-[24px] border border-black/5 bg-white/70 px-4 py-3 text-sm font-medium text-ink/70">
             {payload.user.currentMonthPaceMessage}
           </div>
