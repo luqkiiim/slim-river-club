@@ -17,7 +17,7 @@ export function UserCard({ user, currentMonthLabel }: UserCardProps) {
     : Math.max((user.currentMonthLoss / user.currentMonthRequiredLossKg) * 100, 0);
   const progressValue = user.monthlyStatus === "EXEMPT"
     ? "Exempt"
-    : `${formatWeight(user.currentMonthLoss)} / ${formatWeight(user.currentMonthRequiredLossKg)}`;
+    : `${formatWeight(user.currentMonthLoss).replace(" kg", "")} / ${formatWeight(user.currentMonthRequiredLossKg)}`;
 
   return (
     <article className="border-b border-black/[0.08] last:border-b-0">
