@@ -33,6 +33,7 @@ const seeded = {
   publicPassword: "SomePass123!",
   publicName: `Mobile QA Public ${timestamp}`,
   privateName: `Mobile QA Private ${timestamp}`,
+  thirdName: `Mobile QA Third ${timestamp}`,
 };
 
 function delay(ms) {
@@ -766,6 +767,22 @@ async function seedDatabase() {
     },
   });
 
+  await prisma.user.create({
+    data: {
+      name: seeded.thirdName,
+      email: `mobile-dashboard-third-${timestamp}@example.com`,
+      passwordHash: hashSync("SomePass123!", 10),
+      isParticipant: true,
+      isPrivate: false,
+      startWeight: 72,
+      targetWeight: 66,
+      targetLossKg: 6,
+      monthlyLossTargetKg: 1,
+      monthlyPenaltyRm: 30,
+      challengeStartDate: createUtcDateDaysAgo(60),
+    },
+  });
+
   return {
     adminId: admin.id,
     publicUserId: publicUser.id,
@@ -831,6 +848,43 @@ async function main() {
 
     const dashboardAudit = await auditMobilePage(client, sessionId, "Home");
     assertMobilePage(dashboardAudit);
+    const participantListAudit = await evaluate(
+      client,
+      `(() => {
+        const normalize = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+        const section = document.querySelector('#participants');
+        const cards = section ? [...section.querySelectorAll('article')] : [];
+        const expectedNames = ${JSON.stringify([seeded.publicName, seeded.privateName, seeded.thirdName])};
+        const cardText = cards.map((card) => normalize(card.textContent));
+        const visibleCardCount = cards.filter((card) => {
+          const style = getComputedStyle(card);
+          const rect = card.getBoundingClientRect();
+          return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+        }).length;
+        const disclosureText = section
+          ? [...section.querySelectorAll('summary')].map((summary) => normalize(summary.textContent))
+          : [];
+
+        return {
+          cardCount: cards.length,
+          visibleCardCount,
+          expectedNames,
+          visibleNames: expectedNames.filter((name) => cardText.some((text) => text.includes(name))),
+          disclosureText,
+          hasShowAllControl: disclosureText.some((text) => /^Show all \\d+ participants$/i.test(text)),
+        };
+      })()`,
+      sessionId,
+    );
+
+    if (
+      participantListAudit.cardCount < participantListAudit.expectedNames.length ||
+      participantListAudit.visibleCardCount !== participantListAudit.cardCount ||
+      participantListAudit.visibleNames.length !== participantListAudit.expectedNames.length ||
+      participantListAudit.hasShowAllControl
+    ) {
+      throw new Error(`Participant list state ${JSON.stringify(participantListAudit)}`);
+    }
 
     await clickByRoleAndName(client, sessionId, "button", "Log weight");
     const dialogAudit = await waitFor(
@@ -880,6 +934,7 @@ async function main() {
     const result = {
       status: "passed",
       dashboard: dashboardAudit,
+      participantList: participantListAudit,
       weightDialog: dialogAudit,
       profile: {
         layout: profileAudit,

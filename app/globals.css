@@ -11,17 +11,29 @@
 html {
   min-height: 100%;
   scroll-behavior: smooth;
+  background-color: #fbf8f1;
 }
 
 body {
   min-height: 100vh;
   margin: 0;
+  position: relative;
+  isolation: isolate;
   background-color: #fbf8f1;
-  background-image: url("/assets/warm-paper-texture.webp");
-  background-position: top right;
-  background-repeat: repeat-y;
-  background-size: min(100vw, 760px) auto;
   color: #203326;
+}
+
+/* Keep the paper artwork continuous instead of restarting it down the page. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: url("/assets/warm-paper-texture.webp");
+  background-position: center right;
+  background-repeat: no-repeat;
+  background-size: cover;
 }
 
 ::selection {
@@ -97,12 +109,6 @@ body {
 
   .mobile-sticky-offset {
     padding-bottom: calc(var(--app-bottom-nav-height) + var(--app-action-height) + env(safe-area-inset-bottom) + 1rem);
-  }
-}
-
-@media (min-width: 1024px) {
-  body {
-    background-size: 900px auto;
   }
 }
 

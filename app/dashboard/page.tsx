@@ -266,7 +266,8 @@ export default async function DashboardPage() {
                 </p>
               </div>
             ) : (
-              users.slice(0, 2).map((user) => (
+              /* This club is small enough to keep every participant immediately scannable. */
+              users.map((user) => (
                 <UserCard
                   key={user.id}
                   currentMonthLabel={currentMonthLabel}
@@ -275,23 +276,6 @@ export default async function DashboardPage() {
                 />
               ))
             )}
-            {users.length > 2 ? (
-              <details className="border-t border-black/[0.08]">
-                <summary className="flex min-h-12 cursor-pointer list-none items-center justify-center text-sm font-semibold text-moss">
-                  Show all {users.length} participants
-                </summary>
-                <div>
-                  {users.slice(2).map((user) => (
-                    <UserCard
-                      key={user.id}
-                      currentMonthLabel={currentMonthLabel}
-                      isCurrentUser={user.id === session.user.id}
-                      user={user}
-                    />
-                  ))}
-                </div>
-              </details>
-            ) : null}
           </div>
         </section>
 
