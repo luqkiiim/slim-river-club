@@ -226,7 +226,7 @@ export default async function DashboardPage() {
         isParticipant={session.user.isParticipant}
       />
 
-      <main className={`app-page pt-0 ${canLogWeight ? "[padding-bottom:1.5rem]" : "pb-28 lg:pb-10"}`}>
+      <main className="app-page pb-28 pt-0 lg:pb-10">
         <header>
           <h1 className="text-[28px] font-semibold leading-[1.08] sm:text-5xl">
             Good {getGreeting()},{" "}
@@ -292,6 +292,7 @@ export default async function DashboardPage() {
       ) : null}
       <MobileBottomNav
         active="home"
+        canLogWeight={canLogWeight}
         currentUserId={currentUser?.id}
         currentUserName={session.user.name ?? "Member"}
         isAdmin={session.user.isAdmin}

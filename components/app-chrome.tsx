@@ -2,23 +2,22 @@
 
 import {
   ChartLineUp,
-  DotsThree,
   GearSix,
   House,
   UserCircle,
-  UsersThree,
   X,
 } from "@phosphor-icons/react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { LogWeightModal } from "@/components/log-weight-modal";
 import { LogoutButton } from "@/components/logout-button";
 
-type AppSection = "home" | "group" | "progress" | "admin";
+type AppSection = "home" | "progress" | "admin";
 
 interface AppChromeProps {
   active: AppSection;
+  canLogWeight?: boolean;
   currentUserId?: string;
   currentUserName: string;
   isAdmin: boolean;
@@ -30,67 +29,15 @@ export function AppHeader({
   currentUserName,
   isAdmin,
   isParticipant,
-}: Omit<AppChromeProps, "active">) {
-  const accountHref = isParticipant && currentUserId ? `/users/${currentUserId}` : isAdmin ? "/admin" : "/dashboard";
-
-  return (
-    <header className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-5 pb-2 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 lg:pt-6">
-      <Link
-        className="text-[13px] font-semibold uppercase tracking-[0.28em] text-moss sm:text-sm"
-        href="/dashboard"
-      >
-        Slim River Club
-      </Link>
-
-      <div className="flex items-center gap-2">
-        {isAdmin ? (
-          <Link className="secondary-button hidden lg:inline-flex" href="/admin">
-            <GearSix aria-hidden size={20} weight="bold" />
-            Admin
-          </Link>
-        ) : null}
-        <Link
-          aria-label={`Open ${currentUserName}'s account`}
-          className="flex min-h-11 items-center gap-2 rounded-full px-1.5 py-1 text-sm font-semibold text-ink transition hover:text-moss sm:px-2"
-          href={accountHref}
-        >
-          <span className="grid h-10 w-10 place-items-center rounded-full border border-black/10 bg-sand text-moss">
-            <UserCircle aria-hidden size={26} weight="duotone" />
-          </span>
-          <span className="max-w-24 truncate sm:max-w-40">{currentUserName}</span>
-        </Link>
-        <div className="hidden lg:block">
-          <LogoutButton />
-        </div>
-      </div>
-    </header>
-  );
-}
-
-export function MobileBottomNav({
-  active,
-  currentUserId,
-  currentUserName,
-  isAdmin,
-  isParticipant,
-}: AppChromeProps) {
-  const pathname = usePathname();
-  const [hash, setHash] = useState("");
-  const [moreOpen, setMoreOpen] = useState(false);
-  const moreButtonRef = useRef<HTMLButtonElement>(null);
+}: Omit<AppChromeProps, "active" | "canLogWeight">) {
+  const [accountOpen, setAccountOpen] = useState(false);
+  const accountButtonRef = useRef<HTMLButtonElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const accountDialogRef = useRef<HTMLElement>(null);
+  const accountHref = isParticipant && currentUserId ? `/users/${currentUserId}` : isAdmin ? "/admin" : "/dashboard";
 
   useEffect(() => {
-    const updateHash = () => setHash(window.location.hash);
-    updateHash();
-    window.addEventListener("hashchange", updateHash);
-
-    return () => window.removeEventListener("hashchange", updateHash);
-  }, [pathname]);
-
-  useEffect(() => {
-    if (!moreOpen) {
+    if (!accountOpen) {
       return;
     }
 
@@ -100,7 +47,7 @@ export function MobileBottomNav({
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setMoreOpen(false);
+        setAccountOpen(false);
         return;
       }
 
@@ -130,64 +77,67 @@ export function MobileBottomNav({
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = previousOverflow;
-      moreButtonRef.current?.focus();
+      accountButtonRef.current?.focus();
     };
-  }, [moreOpen]);
-
-  const homeActive = active === "home" && hash !== "#participants";
-  const groupActive = active === "group" || (pathname === "/dashboard" && hash === "#participants");
-  const thirdItem = isParticipant && currentUserId
-    ? {
-        href: `/users/${currentUserId}`,
-        icon: ChartLineUp,
-        label: "Progress",
-        selected: active === "progress",
-      }
-    : {
-        href: "/admin",
-        icon: GearSix,
-        label: "Admin",
-        selected: active === "admin",
-      };
-  const ThirdIcon = thirdItem.icon;
+  }, [accountOpen]);
 
   return (
     <>
-      <nav
-        aria-label="Primary"
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-black/[0.08] bg-cream/95 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_30px_rgba(32,51,38,0.08)] backdrop-blur-md lg:hidden"
-      >
-        <div className="mx-auto grid max-w-xl grid-cols-4">
-          <MobileNavLink href="/dashboard" label="Home" selected={homeActive}>
-            <House aria-hidden size={25} weight={homeActive ? "fill" : "regular"} />
-          </MobileNavLink>
-          <MobileNavLink href="/dashboard#participants" label="Group" selected={groupActive}>
-            <UsersThree aria-hidden size={26} weight={groupActive ? "fill" : "regular"} />
-          </MobileNavLink>
-          <MobileNavLink href={thirdItem.href} label={thirdItem.label} selected={thirdItem.selected}>
-            <ThirdIcon aria-hidden size={25} weight={thirdItem.selected ? "fill" : "regular"} />
-          </MobileNavLink>
+      <header className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-5 pb-2 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 lg:pt-6">
+        <Link
+          className="text-[13px] font-semibold uppercase tracking-[0.28em] text-moss sm:text-sm"
+          href="/dashboard"
+        >
+          Slim River Club
+        </Link>
+
+        <div className="flex items-center gap-2">
+          {isAdmin ? (
+            <Link className="secondary-button hidden lg:inline-flex" href="/admin">
+              <GearSix aria-hidden size={20} weight="bold" />
+              Admin
+            </Link>
+          ) : null}
+
           <button
-            ref={moreButtonRef}
+            ref={accountButtonRef}
             aria-controls="mobile-account-menu"
-            aria-expanded={moreOpen}
+            aria-expanded={accountOpen}
             aria-haspopup="dialog"
-            className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl text-xs font-medium text-ink/70 transition hover:text-moss"
-            onClick={() => setMoreOpen(true)}
+            aria-label={`Open ${currentUserName}'s account menu`}
+            className="flex min-h-11 items-center gap-2 rounded-full px-1.5 py-1 text-sm font-semibold text-ink transition hover:text-moss sm:px-2 lg:hidden"
+            onClick={() => setAccountOpen(true)}
             type="button"
           >
-            <DotsThree aria-hidden size={27} weight="bold" />
-            More
+            <span className="grid h-10 w-10 place-items-center rounded-full border border-black/10 bg-sand text-moss">
+              <UserCircle aria-hidden size={26} weight="duotone" />
+            </span>
+            <span className="max-w-24 truncate sm:max-w-40">{currentUserName}</span>
           </button>
-        </div>
-      </nav>
 
-      {moreOpen ? (
+          <Link
+            aria-label={`Open ${currentUserName}'s account`}
+            className="hidden min-h-11 items-center gap-2 rounded-full px-2 py-1 text-sm font-semibold text-ink transition hover:text-moss lg:flex"
+            href={accountHref}
+          >
+            <span className="grid h-10 w-10 place-items-center rounded-full border border-black/10 bg-sand text-moss">
+              <UserCircle aria-hidden size={26} weight="duotone" />
+            </span>
+            <span className="max-w-40 truncate">{currentUserName}</span>
+          </Link>
+
+          <div className="hidden lg:block">
+            <LogoutButton />
+          </div>
+        </div>
+      </header>
+
+      {accountOpen ? (
         <div className="fixed inset-0 z-50 flex items-end bg-ink/35 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden">
           <button
             aria-label="Dismiss account menu"
             className="absolute inset-0 cursor-default"
-            onClick={() => setMoreOpen(false)}
+            onClick={() => setAccountOpen(false)}
             type="button"
           />
           <section
@@ -209,7 +159,7 @@ export function MobileBottomNav({
                 ref={closeButtonRef}
                 aria-label="Close account menu"
                 className="icon-button"
-                onClick={() => setMoreOpen(false)}
+                onClick={() => setAccountOpen(false)}
                 type="button"
               >
                 <X aria-hidden size={21} weight="bold" />
@@ -221,14 +171,14 @@ export function MobileBottomNav({
                 <Link
                   className="secondary-button justify-start"
                   href={`/users/${currentUserId}`}
-                  onClick={() => setMoreOpen(false)}
+                  onClick={() => setAccountOpen(false)}
                 >
                   <UserCircle aria-hidden size={21} weight="bold" />
                   My profile
                 </Link>
               ) : null}
               {isAdmin ? (
-                <Link className="secondary-button justify-start" href="/admin" onClick={() => setMoreOpen(false)}>
+                <Link className="secondary-button justify-start" href="/admin" onClick={() => setAccountOpen(false)}>
                   <GearSix aria-hidden size={21} weight="bold" />
                   Admin workspace
                 </Link>
@@ -239,6 +189,52 @@ export function MobileBottomNav({
         </div>
       ) : null}
     </>
+  );
+}
+
+export function MobileBottomNav({
+  active,
+  canLogWeight = false,
+  currentUserId,
+  currentUserName,
+  isAdmin,
+  isParticipant,
+}: AppChromeProps) {
+  if (isParticipant && currentUserId) {
+    return (
+      <nav
+        aria-label="Primary"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-black/[0.08] bg-cream/95 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_30px_rgba(32,51,38,0.08)] backdrop-blur-md lg:hidden"
+      >
+        <div className="mx-auto grid max-w-xl grid-cols-3 items-end">
+          <MobileNavLink href="/dashboard" label="Home" selected={active === "home"}>
+            <House aria-hidden size={25} weight={active === "home" ? "fill" : "regular"} />
+          </MobileNavLink>
+          <LogWeightModal currentUserName={currentUserName} disabled={!canLogWeight} triggerVariant="nav" />
+          <MobileNavLink href={`/users/${currentUserId}`} label="Progress" selected={active === "progress"}>
+            <ChartLineUp aria-hidden size={25} weight={active === "progress" ? "fill" : "regular"} />
+          </MobileNavLink>
+        </div>
+      </nav>
+    );
+  }
+
+  return (
+    <nav
+      aria-label="Primary"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-black/[0.08] bg-cream/95 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_30px_rgba(32,51,38,0.08)] backdrop-blur-md lg:hidden"
+    >
+      <div className={`mx-auto grid max-w-xl ${isAdmin ? "grid-cols-2" : "grid-cols-1"}`}>
+        <MobileNavLink href="/dashboard" label="Home" selected={active === "home"}>
+          <House aria-hidden size={25} weight={active === "home" ? "fill" : "regular"} />
+        </MobileNavLink>
+        {isAdmin ? (
+          <MobileNavLink href="/admin" label="Admin" selected={active === "admin"}>
+            <GearSix aria-hidden size={25} weight={active === "admin" ? "fill" : "regular"} />
+          </MobileNavLink>
+        ) : null}
+      </div>
+    </nav>
   );
 }
 
@@ -261,7 +257,7 @@ function MobileNavLink({
       }`}
       href={href}
     >
-      {selected ? <span aria-hidden className="absolute inset-x-4 -top-2 h-0.5 rounded-full bg-leaf" /> : null}
+      {selected ? <span aria-hidden className="absolute inset-x-8 -top-2 h-0.5 rounded-full bg-leaf" /> : null}
       {children}
       {label}
     </Link>

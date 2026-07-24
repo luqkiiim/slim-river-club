@@ -48,7 +48,9 @@ export function CompletionRing({ compact = false, label, mini = false, progressP
           </RadialBarChart>
         </ResponsiveContainer>
       </div>
-      <div className={`absolute flex items-center justify-center rounded-full bg-cream/85 text-center ${mini ? "inset-[15%]" : "inset-[20%] flex-col"}`}>
+      <div className={`absolute flex items-center justify-center rounded-full text-center ${
+        mini ? "inset-[22%] bg-transparent" : "inset-[20%] flex-col bg-cream/85"
+      }`}>
         {mini ? <strong className="text-xs font-semibold tracking-tight text-ink">{value}</strong> : <>
         <span className={`${compact ? "text-[11px]" : "text-xs"} font-semibold uppercase tracking-[0.16em] text-moss`}>{label}</span>
         <strong className={`${compact ? "text-xl sm:text-2xl" : "text-3xl"} mt-1 font-semibold tracking-tight text-ink`}>{value}</strong>

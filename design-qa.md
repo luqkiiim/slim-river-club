@@ -48,4 +48,13 @@ No actionable P0, P1, or P2 mismatches remain for this scoped background-continu
 
 The authenticated dashboard rendered successfully in the in-app browser. The page was scrolled through the background and full participant card; all five profiles, the Log weight action, and navigation remain present, and no browser-console errors were observed.
 
+## Mobile navigation and participant ring follow-up
+
+- The participant bottom navigation now contains exactly Home, a raised 64-pixel Log weight action, and Progress. The former Group anchor and More button are absent.
+- The Log weight action opens the existing accessible sheet, focuses the weight field, closes with Escape, and restores focus to the centre action.
+- Account actions moved to the mobile header sheet; the admin click-through confirms that the sheet opens and sign-out still completes.
+- Participant rings retain the 64-pixel size, use a light-sage track and dark-green progress arc, and no longer lose thickness beneath the centre label layer.
+- The 390 Ã— 844 mobile audit reports no horizontal overflow, no undersized controls, and no overlap between a separate page action and the navigation.
+- Visual inspection covered partial, complete, and exempt ring states. No framework overlay or browser-console error was present.
+
 final result: passed

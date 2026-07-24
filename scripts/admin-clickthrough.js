@@ -1764,7 +1764,7 @@ async function runClickthrough(client, sessionId) {
     await waitForPath(client, sessionId, "/dashboard");
     await waitForNoAppError(client, sessionId);
     await waitForText(client, sessionId, "Group momentum");
-    await clickByText(client, sessionId, "More");
+    await clickByAccessibleName(client, sessionId, "button", `Open ${seeded.adminName}'s account menu`);
     await waitForText(client, sessionId, "Account");
     await clickByText(client, sessionId, "Sign out");
     await waitForPath(client, sessionId, "/login");

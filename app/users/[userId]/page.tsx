@@ -19,7 +19,7 @@ import { ProfileTabs } from "@/components/profile-tabs";
 import { ProgressBar } from "@/components/progress-bar";
 import { WeightChart } from "@/components/weight-chart";
 import { WeightTable } from "@/components/weight-table";
-import { getUserProfilePayload } from "@/lib/data";
+import { canParticipantLogWeight, getUserProfilePayload } from "@/lib/data";
 import { requireSession } from "@/lib/session";
 import {
   formatMonthlyStatusLabel,
@@ -276,6 +276,11 @@ export default async function UserProfilePage({
   }
 
   const isOwnProfile = payload.user.id === session.user.id;
+  const viewerCanLogWeight = session.user.isParticipant && (
+    isOwnProfile
+      ? !payload.user.needsStartingWeight
+      : await canParticipantLogWeight(session.user.id)
+  );
   const canSeePaceGuidance = isOwnProfile || session.user.isAdmin;
   const currentMonth = getCurrentMonthPeriod();
   const currentMonthLabel = getMonthLabel(currentMonth.month, currentMonth.year);
@@ -424,13 +429,7 @@ export default async function UserProfilePage({
         isParticipant={session.user.isParticipant}
       />
 
-      <main
-        className={`app-page pt-3 ${
-          isOwnProfile && session.user.isParticipant && !payload.user.needsStartingWeight
-            ? "[padding-bottom:1.5rem]"
-            : "pb-28 lg:pb-10"
-        }`}
-      >
+      <main className="app-page pb-28 pt-3 lg:pb-10">
         <header className="mb-5 flex items-start gap-3 pt-4">
           <Link aria-label="Back to dashboard" className="icon-button mt-0.5" href="/dashboard">
             <ArrowLeft aria-hidden size={21} weight="bold" />
@@ -458,6 +457,7 @@ export default async function UserProfilePage({
       ) : null}
       <MobileBottomNav
         active="progress"
+        canLogWeight={viewerCanLogWeight}
         currentUserId={session.user.isParticipant ? session.user.id : undefined}
         currentUserName={session.user.name ?? "Member"}
         isAdmin={session.user.isAdmin}

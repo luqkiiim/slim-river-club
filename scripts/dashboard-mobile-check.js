@@ -368,6 +368,11 @@ async function auditMobilePage(client, sessionId, expectedActiveNav) {
       );
       const triggerRect = logWeightTrigger?.getBoundingClientRect();
       const navRect = nav?.getBoundingClientRect();
+      const navItems = nav
+        ? Array.from(nav.querySelectorAll('a[href], button'))
+            .filter(visible)
+            .map((node) => normalize(node.getAttribute('aria-label') || node.textContent))
+        : [];
 
       return {
         path: location.pathname,
@@ -384,9 +389,14 @@ async function auditMobilePage(client, sessionId, expectedActiveNav) {
         smallControls,
         undersizedInputs,
         hasLogWeightTrigger: Boolean(logWeightTrigger),
+        navItems,
+        hasLegacyGroupItem: navItems.includes('Group'),
+        hasLegacyMoreItem: navItems.includes('More'),
+        logWeightIsNavAction: Boolean(logWeightTrigger && nav?.contains(logWeightTrigger)),
         logWeightOverlapsNav: Boolean(
           triggerRect &&
           navRect &&
+          !nav?.contains(logWeightTrigger) &&
           triggerRect.bottom > navRect.top + 1 &&
           triggerRect.top < navRect.bottom - 1
         ),
@@ -425,6 +435,12 @@ function assertMobilePage(result, { expectLogWeight = true } = {}) {
   }
   if (expectLogWeight && !result.hasLogWeightTrigger) {
     issues.push("Log weight trigger is missing");
+  }
+  if (expectLogWeight && !result.logWeightIsNavAction) {
+    issues.push("Log weight is not part of the bottom navigation");
+  }
+  if (result.hasLegacyGroupItem || result.hasLegacyMoreItem) {
+    issues.push(`legacy navigation items remain: ${JSON.stringify(result.navItems)}`);
   }
   if (expectLogWeight && result.logWeightOverlapsNav) {
     issues.push("Log weight trigger overlaps the bottom navigation");

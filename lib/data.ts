@@ -756,6 +756,19 @@ function buildHistoryRows(displayMode: TrackingDisplayMode, timeline: ResolvedWe
   }));
 }
 
+export async function canParticipantLogWeight(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      isParticipant: true,
+      isPrivate: true,
+      startWeight: true,
+    },
+  });
+
+  return Boolean(user?.isParticipant && (!user.isPrivate || user.startWeight !== null));
+}
+
 export async function getUserProfilePayload(userId: string, viewerUserId: string): Promise<UserProfilePayload | null> {
   await syncUserMonthlyResults(userId);
   const [monthPolicyRecords, userMonthPolicyRecords] = await Promise.all([

@@ -2,6 +2,7 @@
 
 import { Scales, X } from "@phosphor-icons/react";
 import { useActionState, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { logWeightAction } from "@/lib/actions/weight-actions";
 import { currentDateInputValue } from "@/lib/weight-utils";
@@ -9,9 +10,15 @@ import { initialActionState } from "@/types/form";
 
 interface LogWeightModalProps {
   currentUserName: string;
+  disabled?: boolean;
+  triggerVariant?: "desktop" | "nav";
 }
 
-export function LogWeightModal({ currentUserName }: LogWeightModalProps) {
+export function LogWeightModal({
+  currentUserName,
+  disabled = false,
+  triggerVariant = "desktop",
+}: LogWeightModalProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -88,20 +95,38 @@ export function LogWeightModal({ currentUserName }: LogWeightModalProps) {
 
   return (
     <>
-      <div className="mx-auto w-full max-w-7xl px-5 pb-[calc(var(--app-bottom-nav-height)+env(safe-area-inset-bottom)+0.75rem)] sm:px-6 lg:pb-8">
-        <button
-          ref={triggerRef}
-          aria-haspopup="dialog"
-          type="button"
-          className="primary-button mx-auto flex w-full max-w-xl shadow-float"
-          onClick={() => setOpen(true)}
-        >
-          <Scales aria-hidden size={22} weight="bold" />
-          Log weight
-        </button>
-      </div>
+      {triggerVariant === "nav" ? (
+        <div className="relative flex min-h-14 flex-col items-center justify-end">
+          <button
+            ref={triggerRef}
+            aria-haspopup="dialog"
+            aria-label={disabled ? "Log weight unavailable until starting weight is set" : "Log weight"}
+            className="absolute -top-8 grid h-16 w-16 place-items-center rounded-full border-[5px] border-cream bg-moss text-white shadow-float transition hover:bg-ink disabled:cursor-not-allowed disabled:bg-moss/45"
+            disabled={disabled}
+            onClick={() => setOpen(true)}
+            title={disabled ? "Set your starting weight before logging" : undefined}
+            type="button"
+          >
+            <Scales aria-hidden size={27} weight="bold" />
+          </button>
+          <span className={`text-xs font-semibold ${disabled ? "text-ink/45" : "text-moss"}`}>Log</span>
+        </div>
+      ) : (
+        <div className="mx-auto hidden w-full max-w-7xl px-5 pb-8 sm:px-6 lg:block">
+          <button
+            ref={triggerRef}
+            aria-haspopup="dialog"
+            type="button"
+            className="primary-button mx-auto flex w-full max-w-xl shadow-float"
+            onClick={() => setOpen(true)}
+          >
+            <Scales aria-hidden size={22} weight="bold" />
+            Log weight
+          </button>
+        </div>
+      )}
 
-      {open ? (
+      {open && typeof document !== "undefined" ? createPortal(
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/35 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:items-center sm:p-5">
           <button
             aria-label="Dismiss weight entry dialog"
@@ -184,7 +209,8 @@ export function LogWeightModal({ currentUserName }: LogWeightModalProps) {
               </button>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </>
   );
