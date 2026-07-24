@@ -959,6 +959,8 @@ async function runClickthrough(client, sessionId) {
     await setFieldValue(client, sessionId, "email", seeded.adminEmail);
     await setFieldValue(client, sessionId, "password", seeded.adminPassword);
     await submitFormByButtonText(client, sessionId, "Log in");
+    await waitForPath(client, sessionId, "/dashboard");
+    await clickByText(client, sessionId, "Admin");
     await waitForPath(client, sessionId, "/admin");
     await waitForText(client, sessionId, "Club workspace");
     await waitForNoAppError(client, sessionId);
@@ -1083,6 +1085,64 @@ async function runClickthrough(client, sessionId) {
     await waitForText(client, sessionId, seeded.pendingPrivateName);
     await clickInArticle(client, sessionId, seeded.pendingPrivateName, "Manage");
     await waitForText(client, sessionId, "1.25 kg");
+    await setFieldValueInForm(client, sessionId, "Save personal rule", "month", "2098-11");
+    await setFieldValueInForm(client, sessionId, "Save personal rule", "requiredTargetPct", "60");
+    await submitFormByButtonText(client, sessionId, "Save personal rule");
+
+    const privatePolicy = await waitFor(
+      async () => {
+        const policy = await prisma.userMonthPolicy.findUnique({
+          where: {
+            userId_month_year: {
+              userId: pendingUser.id,
+              month: 11,
+              year: 2098,
+            },
+          },
+          select: {
+            id: true,
+            requiredTargetPct: true,
+          },
+        });
+
+        if (policy?.requiredTargetPct === 60) {
+          return policy;
+        }
+
+        throw new Error(`Unexpected private participant policy: ${JSON.stringify(policy)}`);
+      },
+      15000,
+      "private participant month rule persistence",
+    );
+
+    await navigateTo(client, sessionId, `${baseUrl}/admin`);
+    await clickByText(client, sessionId, "Claims");
+    await clickInArticle(client, sessionId, seeded.pendingPrivateName, "Manage");
+    await waitForText(client, sessionId, "November 2098");
+    await waitForText(client, sessionId, "Personal 60% · 1.2 kg required");
+    await submitFormByHiddenValue(client, sessionId, "policyId", privatePolicy.id, "Remove");
+
+    await waitFor(
+      async () => {
+        const policy = await prisma.userMonthPolicy.findUnique({
+          where: {
+            id: privatePolicy.id,
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        if (!policy) {
+          return true;
+        }
+
+        throw new Error("Private participant month rule still exists");
+      },
+      15000,
+      "private participant month rule removal",
+    );
+
     await clickByText(client, sessionId, "x");
   });
 
@@ -1173,6 +1233,133 @@ async function runClickthrough(client, sessionId) {
     await clickByText(client, sessionId, "x");
   });
 
+  await recordStep("closed personal month target recalculates the participant only", async () => {
+    await clickInArticle(client, sessionId, seeded.publicName, "Manage");
+    await waitForText(client, sessionId, "Personal month targets");
+    await setFieldValueInForm(client, sessionId, "Save personal rule", "month", "2026-02");
+    await setFieldValueInForm(client, sessionId, "Save personal rule", "requiredTargetPct", "75");
+    await waitForText(client, sessionId, "75% requires 1.5 kg instead of 2 kg in February 2026.");
+    await submitFormByButtonText(client, sessionId, "Save personal rule");
+
+    const discounted = await waitFor(
+      async () => {
+        const user = await prisma.user.findFirst({
+          where: {
+            name: seeded.publicName,
+          },
+          select: {
+            id: true,
+            monthlyPenaltyRm: true,
+          },
+        });
+
+        if (!user) {
+          throw new Error("Seeded public participant is missing");
+        }
+
+        const [policy, result] = await Promise.all([
+          prisma.userMonthPolicy.findUnique({
+            where: {
+              userId_month_year: {
+                userId: user.id,
+                month: 2,
+                year: 2026,
+              },
+            },
+            select: {
+              id: true,
+              requiredTargetPct: true,
+            },
+          }),
+          prisma.monthlyResult.findUnique({
+            where: {
+              userId_month_year: {
+                userId: user.id,
+                month: 2,
+                year: 2026,
+              },
+            },
+            select: {
+              requiredLossKg: true,
+              targetRatioPct: true,
+              penaltyApplied: true,
+              penaltyAmountRm: true,
+            },
+          }),
+        ]);
+
+        const isExpected =
+          policy?.requiredTargetPct === 75
+          && result?.targetRatioPct === 75
+          && Math.abs(result.requiredLossKg - 1.5) < 0.001
+          && result.penaltyApplied === false
+          && result.penaltyAmountRm === 0
+          && user.monthlyPenaltyRm === 30;
+
+        if (isExpected) {
+          return { policy, userId: user.id };
+        }
+
+        throw new Error(`Unexpected discounted result: ${JSON.stringify({ policy, result, user })}`);
+      },
+      15000,
+      "closed personal month target recalculation",
+    );
+
+    await navigateTo(client, sessionId, `${baseUrl}/admin`);
+    await clickByText(client, sessionId, "Participants");
+    await clickInArticle(client, sessionId, seeded.publicName, "Manage");
+    await waitForText(client, sessionId, "February 2026");
+    await submitFormByHiddenValue(client, sessionId, "policyId", discounted.policy.id, "Remove");
+
+    await waitFor(
+      async () => {
+        const [policy, result] = await Promise.all([
+          prisma.userMonthPolicy.findUnique({
+            where: {
+              id: discounted.policy.id,
+            },
+            select: {
+              id: true,
+            },
+          }),
+          prisma.monthlyResult.findUnique({
+            where: {
+              userId_month_year: {
+                userId: discounted.userId,
+                month: 2,
+                year: 2026,
+              },
+            },
+            select: {
+              requiredLossKg: true,
+              targetRatioPct: true,
+              penaltyApplied: true,
+              penaltyAmountRm: true,
+            },
+          }),
+        ]);
+
+        const isExpected =
+          !policy
+          && result?.targetRatioPct === 100
+          && Math.abs(result.requiredLossKg - 2) < 0.001
+          && result.penaltyApplied === true
+          && result.penaltyAmountRm === 30;
+
+        if (isExpected) {
+          return true;
+        }
+
+        throw new Error(`Unexpected restored result: ${JSON.stringify({ policy, result })}`);
+      },
+      15000,
+      "closed personal month target fallback",
+    );
+
+    await clickByText(client, sessionId, "x");
+  });
+
   await recordStep("admin-only editor opens", async () => {
     await clickInArticle(client, sessionId, seeded.adminOnlyName, "Manage");
     await waitForText(client, sessionId, "Management account");
@@ -1181,11 +1368,11 @@ async function runClickthrough(client, sessionId) {
     await delay(1000);
   });
 
-  await recordStep("month rule add and remove works", async () => {
+  await recordStep("group and personal month rules add and remove work", async () => {
     await clickByText(client, sessionId, "Settings");
     await waitForText(client, sessionId, "Month rules");
     await setFieldValueInForm(client, sessionId, "Save rule", "month", seeded.futureMonth);
-    await setFieldValueInForm(client, sessionId, "Save rule", "requiredTargetPct", "75");
+    await setFieldValueInForm(client, sessionId, "Save rule", "requiredTargetPct", "50");
     await submitFormByButtonText(client, sessionId, "Save rule");
     await delay(2500);
 
@@ -1205,13 +1392,86 @@ async function runClickthrough(client, sessionId) {
         data: {
           year: 2099,
           month: 12,
-          requiredTargetPct: 75,
+          requiredTargetPct: 50,
         },
         select: {
           id: true,
         },
       });
     }
+
+    await navigateTo(client, sessionId, `${baseUrl}/admin`);
+    await clickByText(client, sessionId, "Participants");
+    await clickInArticle(client, sessionId, seeded.publicName, "Manage");
+    await waitForText(client, sessionId, "Personal month targets");
+    await setFieldValueInForm(client, sessionId, "Save personal rule", "month", seeded.futureMonth);
+    await setFieldValueInForm(client, sessionId, "Save personal rule", "requiredTargetPct", "75");
+    await waitForText(client, sessionId, "This replaces the 50% group rule.");
+    await submitFormByButtonText(client, sessionId, "Save personal rule");
+
+    const personalPolicy = await waitFor(
+      async () => {
+        const policy = await prisma.userMonthPolicy.findFirst({
+          where: {
+            user: {
+              name: seeded.publicName,
+            },
+            year: 2099,
+            month: 12,
+          },
+          select: {
+            id: true,
+            requiredTargetPct: true,
+          },
+        });
+
+        if (policy?.requiredTargetPct === 75) {
+          return policy;
+        }
+
+        throw new Error(`Unexpected personal policy: ${JSON.stringify(policy)}`);
+      },
+      15000,
+      "personal month rule persistence",
+    );
+
+    await navigateTo(client, sessionId, `${baseUrl}/admin`);
+    await clickByText(client, sessionId, "Participants");
+    await clickInArticle(client, sessionId, seeded.publicName, "Manage");
+    await waitForText(client, sessionId, seeded.futureMonthLabel);
+    await waitForText(client, sessionId, "Personal 75% · 1.5 kg required");
+    await waitForText(client, sessionId, "Overrides the 50% group rule");
+    await setFieldValueInForm(client, sessionId, "Save personal rule", "month", seeded.futureMonth);
+    await setFieldValueInForm(client, sessionId, "Save personal rule", "requiredTargetPct", "100");
+    await waitForText(client, sessionId, "The 50% fallback will require 1 kg");
+    await submitFormByButtonText(client, sessionId, "Save personal rule");
+
+    await waitFor(
+      async () => {
+        const policy = await prisma.userMonthPolicy.findUnique({
+          where: {
+            id: personalPolicy.id,
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        if (!policy) {
+          return true;
+        }
+
+        throw new Error("Personal month rule still exists after saving 100%");
+      },
+      15000,
+      "personal month rule 100% fallback",
+    );
+
+    await navigateTo(client, sessionId, `${baseUrl}/admin`);
+    await clickByText(client, sessionId, "Participants");
+    await clickInArticle(client, sessionId, seeded.publicName, "Manage");
+    await waitForTextGone(client, sessionId, seeded.futureMonthLabel);
+    await clickByText(client, sessionId, "x");
 
     await navigateTo(client, sessionId, `${baseUrl}/admin`);
     await clickByText(client, sessionId, "Settings");

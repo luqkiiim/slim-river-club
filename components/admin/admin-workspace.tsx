@@ -14,7 +14,9 @@ import {
   createPrivateProgressEntryAction,
   createWeightEntryAction,
   deleteMonthPolicyAction,
+  deleteUserMonthPolicyAction,
   upsertMonthPolicyAction,
+  upsertUserMonthPolicyAction,
   updateAdminPrivacyModeAction,
   updateChallengeStartDateAction,
   updateHeightAction,
@@ -33,6 +35,7 @@ import {
   formatDate,
   formatDateInput,
   formatLossDelta,
+  formatMonthInput,
   formatRm,
   formatWeight,
   getMonthLabel,
@@ -541,14 +544,156 @@ function EntryEditor({
   );
 }
 
+function PersonalMonthTargets({
+  monthPolicies,
+  user,
+}: {
+  monthPolicies: MonthPolicySummary[];
+  user: AdminUserSummary;
+}) {
+  const initialMonth = currentMonthInputValue();
+  const initialPolicy = user.personalMonthPolicies.find(
+    (policy) => formatMonthInput(policy.year, policy.month) === initialMonth,
+  );
+  const [selectedMonth, setSelectedMonth] = useState(initialMonth);
+  const [requiredTargetPct, setRequiredTargetPct] = useState(
+    `${initialPolicy?.requiredTargetPct ?? 75}`,
+  );
+  const [selectedYear, selectedMonthNumber] = selectedMonth.split("-").map(Number);
+  const selectedGroupPolicy = monthPolicies.find(
+    (policy) => policy.year === selectedYear && policy.month === selectedMonthNumber,
+  );
+  const parsedTargetPct = Number(requiredTargetPct);
+  const hasValidPreview = Number.isFinite(parsedTargetPct) && parsedTargetPct >= 1 && parsedTargetPct <= 200;
+  const previewRequiredLossKg = hasValidPreview
+    ? (user.monthlyLossTargetKg * parsedTargetPct) / 100
+    : null;
+  const fallbackTargetPct = selectedGroupPolicy?.requiredTargetPct ?? 100;
+  const fallbackRequiredLossKg = (user.monthlyLossTargetKg * fallbackTargetPct) / 100;
+  const selectedMonthLabel = selectedYear && selectedMonthNumber
+    ? getMonthLabel(selectedMonthNumber, selectedYear)
+    : "the selected month";
+
+  function handleMonthChange(value: string) {
+    setSelectedMonth(value);
+
+    const [year, month] = value.split("-").map(Number);
+    const existingPolicy = user.personalMonthPolicies.find(
+      (policy) => policy.year === year && policy.month === month,
+    );
+
+    setRequiredTargetPct(`${existingPolicy?.requiredTargetPct ?? 75}`);
+  }
+
+  return (
+    <EditorSection
+      description="Set an exception for this participant only. It replaces any group rule for the same month."
+      title="Personal month targets"
+    >
+      <form action={upsertUserMonthPolicyAction} className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+        <input name="userId" type="hidden" value={user.id} />
+        <label className="block space-y-2 text-sm font-medium text-ink">
+          <span>Month</span>
+          <input
+            className="field"
+            name="month"
+            onChange={(event) => handleMonthChange(event.target.value)}
+            required
+            type="month"
+            value={selectedMonth}
+          />
+        </label>
+        <label className="block space-y-2 text-sm font-medium text-ink">
+          <span>Required % of normal target</span>
+          <input
+            className="field"
+            max="200"
+            min="1"
+            name="requiredTargetPct"
+            onChange={(event) => setRequiredTargetPct(event.target.value)}
+            required
+            step="1"
+            type="number"
+            value={requiredTargetPct}
+          />
+        </label>
+        <div className="flex items-end">
+          <button className="primary-button w-full md:w-auto" type="submit">
+            Save personal rule
+          </button>
+        </div>
+      </form>
+
+      <div className="mt-3 rounded-2xl bg-sand/45 px-4 py-3 text-sm text-ink/65">
+        {parsedTargetPct === 100 ? (
+          <p>
+            Saving 100% removes the personal rule. The {fallbackTargetPct}% fallback will require{" "}
+            <span className="font-semibold text-ink">{formatWeight(fallbackRequiredLossKg)}</span> in{" "}
+            {selectedMonthLabel}.
+          </p>
+        ) : previewRequiredLossKg !== null ? (
+          <p>
+            {parsedTargetPct}% requires{" "}
+            <span className="font-semibold text-ink">{formatWeight(previewRequiredLossKg)}</span> instead of{" "}
+            {formatWeight(user.monthlyLossTargetKg)} in {selectedMonthLabel}.
+            {selectedGroupPolicy ? ` This replaces the ${selectedGroupPolicy.requiredTargetPct}% group rule.` : ""}
+          </p>
+        ) : (
+          <p>Enter a percentage from 1% to 200% to preview the required loss.</p>
+        )}
+      </div>
+
+      <div className="mt-4 space-y-3">
+        {user.personalMonthPolicies.length === 0 ? (
+          <ParticipantEmptyState message="No personal month targets yet." />
+        ) : (
+          user.personalMonthPolicies.map((policy) => {
+            const groupPolicy = monthPolicies.find(
+              (candidate) => candidate.year === policy.year && candidate.month === policy.month,
+            );
+            const requiredLossKg = (user.monthlyLossTargetKg * policy.requiredTargetPct) / 100;
+
+            return (
+              <div
+                className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-black/5 bg-white/80 px-4 py-3"
+                key={policy.id}
+              >
+                <div>
+                  <p className="font-semibold text-ink">{getMonthLabel(policy.month, policy.year)}</p>
+                  <p className="mt-1 text-sm text-ink/60">
+                    Personal {policy.requiredTargetPct}% · {formatWeight(requiredLossKg)} required
+                  </p>
+                  <p className="mt-1 text-xs font-medium text-moss">
+                    {groupPolicy
+                      ? `Overrides the ${groupPolicy.requiredTargetPct}% group rule`
+                      : "Overrides the normal 100% target"}
+                  </p>
+                </div>
+                <form action={deleteUserMonthPolicyAction}>
+                  <input name="policyId" type="hidden" value={policy.id} />
+                  <button className="secondary-button px-4 py-2" type="submit">
+                    Remove
+                  </button>
+                </form>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </EditorSection>
+  );
+}
+
 function ParticipantEditor({
   adminCount,
   entries,
+  monthPolicies,
   sessionUserId,
   user,
 }: {
   adminCount: number;
   entries: AdminEntrySummary[];
+  monthPolicies: MonthPolicySummary[];
   sessionUserId: string;
   user: AdminUserSummary;
 }) {
@@ -671,6 +816,8 @@ function ParticipantEditor({
             </SettingBlock>
           </div>
         </EditorSection>
+
+        <PersonalMonthTargets monthPolicies={monthPolicies} user={user} />
 
         <EditorSection
           description={
@@ -1235,6 +1382,8 @@ export function AdminWorkspace({
             <ParticipantEditor
               adminCount={adminCount}
               entries={selectedEntries}
+              key={selectedUser.id}
+              monthPolicies={monthPolicies}
               sessionUserId={sessionUserId}
               user={selectedUser}
             />

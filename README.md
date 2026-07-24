@@ -9,7 +9,7 @@ Mobile-friendly weight loss tracker for a single office group. Built with Next.j
 - First registered user can be admin-only without joining the tracked member list
 - Admins can pre-create participants and share claim codes for later signup
 - Dashboard with all users, leaderboards, progress bars, and RM owed
-- Automatic monthly penalty calculation for closed calendar months, with per-participant targets, start dates, and penalty amounts
+- Automatic monthly penalty calculation for closed calendar months, with per-participant targets, personal month adjustments, start dates, and penalty amounts
 - Member backfill support for historical weight entries
 - Personal profile page with weight chart and history table
 - Floating modal for daily weight logging

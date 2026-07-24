@@ -40,6 +40,7 @@ import type {
   ProfileHistoryRow,
   ProfileMonthlyResult,
   TrackingDisplayMode,
+  UserMonthPolicySummary,
   UserProfilePayload,
 } from "@/types/app";
 
@@ -59,6 +60,11 @@ type UserWithRelations = Prisma.UserGetPayload<{
 type ParticipantUserWithRelations = UserWithRelations;
 type MonthPolicyRecord = Pick<MonthPolicySummary, "month" | "year" | "requiredTargetPct">;
 type MonthPolicyMap = Map<string, MonthPolicyRecord>;
+type UserMonthPolicyRecord = Pick<
+  UserMonthPolicySummary,
+  "userId" | "month" | "year" | "requiredTargetPct"
+>;
+type UserMonthPolicyMap = Map<string, UserMonthPolicyRecord>;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 interface TrackingState {
@@ -108,8 +114,30 @@ function buildMonthPolicyMap(policies: MonthPolicyRecord[]) {
   return new Map(policies.map((policy) => [buildMonthPolicyKey(policy.month, policy.year), policy]));
 }
 
-function getTargetRatioPctForPeriod(policies: MonthPolicyMap, period: { month: number; year: number }) {
-  return policies.get(buildMonthPolicyKey(period.month, period.year))?.requiredTargetPct ?? 100;
+function buildUserMonthPolicyKey(userId: string, month: number, year: number) {
+  return `${userId}:${buildMonthPolicyKey(month, year)}`;
+}
+
+function buildUserMonthPolicyMap(policies: UserMonthPolicyRecord[]) {
+  return new Map(
+    policies.map((policy) => [
+      buildUserMonthPolicyKey(policy.userId, policy.month, policy.year),
+      policy,
+    ]),
+  );
+}
+
+function getTargetRatioPctForPeriod(
+  userId: string,
+  monthPolicies: MonthPolicyMap,
+  userMonthPolicies: UserMonthPolicyMap,
+  period: { month: number; year: number },
+) {
+  const userPolicy = userMonthPolicies.get(buildUserMonthPolicyKey(userId, period.month, period.year));
+
+  return userPolicy?.requiredTargetPct
+    ?? monthPolicies.get(buildMonthPolicyKey(period.month, period.year))?.requiredTargetPct
+    ?? 100;
 }
 
 function getDaysInPeriod(period: { month: number; year: number }) {
@@ -353,11 +381,17 @@ function getHistoricalMonthlyStatus(
 function buildDashboardUser(
   user: ParticipantUserWithRelations,
   monthPolicies: MonthPolicyMap,
+  userMonthPolicies: UserMonthPolicyMap,
   viewerUserId?: string,
 ): DashboardUserSummary {
   const tracking = buildTrackingState(user, viewerUserId);
   const currentMonth = getCurrentMonthPeriod();
-  const currentMonthTargetPct = getTargetRatioPctForPeriod(monthPolicies, currentMonth);
+  const currentMonthTargetPct = getTargetRatioPctForPeriod(
+    user.id,
+    monthPolicies,
+    userMonthPolicies,
+    currentMonth,
+  );
   const currentMonthRequiredLossKg = getRequiredLossKg(tracking.monthlyLossTargetKg, currentMonthTargetPct);
   const currentMonthStartWeight =
     tracking.displayMode === "weight"
@@ -438,7 +472,12 @@ function buildGroupSummary(users: DashboardUserSummary[]): GroupSummary {
   };
 }
 
-async function upsertMonthlyResultsForUser(user: ParticipantUserWithRelations, monthPolicies: MonthPolicyMap, db: DbClient) {
+async function upsertMonthlyResultsForUser(
+  user: ParticipantUserWithRelations,
+  monthPolicies: MonthPolicyMap,
+  userMonthPolicies: UserMonthPolicyMap,
+  db: DbClient,
+) {
   const challengeStartDate = getEffectiveChallengeStartDate(user);
   const periods = getClosedMonthPeriods(challengeStartDate);
   const tracking = buildTrackingState(user);
@@ -450,7 +489,12 @@ async function upsertMonthlyResultsForUser(user: ParticipantUserWithRelations, m
 
   for (const period of periods) {
     const penaltyExempt = isPenaltyExemptPeriod(challengeStartDate, period);
-    const targetRatioPct = getTargetRatioPctForPeriod(monthPolicies, period);
+    const targetRatioPct = getTargetRatioPctForPeriod(
+      user.id,
+      monthPolicies,
+      userMonthPolicies,
+      period,
+    );
     const requiredLossKg = getRequiredLossKg(tracking.monthlyLossTargetKg, targetRatioPct);
     const measurementStart = penaltyExempt ? challengeStartDate : period.start;
     const totalLostBeforeMonth = getTotalKgLostBefore(tracking.timeline, measurementStart);
@@ -539,15 +583,24 @@ async function upsertMonthlyResultsForUser(user: ParticipantUserWithRelations, m
 }
 
 export async function syncUserMonthlyResults(userId: string, db: DbClient = prisma) {
-  const monthPolicies = buildMonthPolicyMap(
-    await db.monthPolicy.findMany({
-      select: {
-        month: true,
-        year: true,
-        requiredTargetPct: true,
-      },
-    }),
-  );
+  const monthPolicyRecords = await db.monthPolicy.findMany({
+    select: {
+      month: true,
+      year: true,
+      requiredTargetPct: true,
+    },
+  });
+  const userMonthPolicyRecords = await db.userMonthPolicy.findMany({
+    where: { userId },
+    select: {
+      userId: true,
+      month: true,
+      year: true,
+      requiredTargetPct: true,
+    },
+  });
+  const monthPolicies = buildMonthPolicyMap(monthPolicyRecords);
+  const userMonthPolicies = buildUserMonthPolicyMap(userMonthPolicyRecords);
   const user = await db.user.findUnique({
     where: { id: userId },
     include: {
@@ -582,70 +635,91 @@ export async function syncUserMonthlyResults(userId: string, db: DbClient = pris
     return user.id;
   }
 
-  await upsertMonthlyResultsForUser(user, monthPolicies, db);
+  await upsertMonthlyResultsForUser(user, monthPolicies, userMonthPolicies, db);
 
   return user.id;
 }
 
 export async function syncAllMonthlyResults() {
-  const monthPolicies = buildMonthPolicyMap(
-    await prisma.monthPolicy.findMany({
+  const [monthPolicyRecords, userMonthPolicyRecords, users] = await Promise.all([
+    prisma.monthPolicy.findMany({
       select: {
         month: true,
         year: true,
         requiredTargetPct: true,
       },
     }),
-  );
-  const users = await prisma.user.findMany({
-    where: {
-      isParticipant: true,
-    },
-    include: {
-      weightEntries: {
-        orderBy: [{ date: "asc" }, { createdAt: "asc" }],
+    prisma.userMonthPolicy.findMany({
+      select: {
+        userId: true,
+        month: true,
+        year: true,
+        requiredTargetPct: true,
       },
-      monthlyResults: {
-        orderBy: [{ year: "desc" }, { month: "desc" }],
+    }),
+    prisma.user.findMany({
+      where: {
+        isParticipant: true,
       },
-    },
-  });
+      include: {
+        weightEntries: {
+          orderBy: [{ date: "asc" }, { createdAt: "asc" }],
+        },
+        monthlyResults: {
+          orderBy: [{ year: "desc" }, { month: "desc" }],
+        },
+      },
+    }),
+  ]);
+  const monthPolicies = buildMonthPolicyMap(monthPolicyRecords);
+  const userMonthPolicies = buildUserMonthPolicyMap(userMonthPolicyRecords);
 
   for (const user of users) {
-    await upsertMonthlyResultsForUser(user, monthPolicies, prisma);
+    await upsertMonthlyResultsForUser(user, monthPolicies, userMonthPolicies, prisma);
   }
 }
 
 export async function getDashboardPayload(viewerUserId?: string) {
   await syncAllMonthlyResults();
-  const monthPolicies = buildMonthPolicyMap(
-    await prisma.monthPolicy.findMany({
+  const [monthPolicyRecords, userMonthPolicyRecords, users] = await Promise.all([
+    prisma.monthPolicy.findMany({
       select: {
         month: true,
         year: true,
         requiredTargetPct: true,
       },
     }),
+    prisma.userMonthPolicy.findMany({
+      select: {
+        userId: true,
+        month: true,
+        year: true,
+        requiredTargetPct: true,
+      },
+    }),
+    prisma.user.findMany({
+      where: {
+        isParticipant: true,
+      },
+      include: {
+        weightEntries: {
+          orderBy: [{ date: "asc" }, { createdAt: "asc" }],
+        },
+        monthlyResults: {
+          orderBy: [{ year: "desc" }, { month: "desc" }],
+        },
+      },
+      orderBy: {
+        createdAt: "asc",
+      },
+    }),
+  ]);
+  const monthPolicies = buildMonthPolicyMap(monthPolicyRecords);
+  const userMonthPolicies = buildUserMonthPolicyMap(userMonthPolicyRecords);
+
+  const summaries = users.map((user) =>
+    buildDashboardUser(user, monthPolicies, userMonthPolicies, viewerUserId),
   );
-
-  const users = await prisma.user.findMany({
-    where: {
-      isParticipant: true,
-    },
-    include: {
-      weightEntries: {
-        orderBy: [{ date: "asc" }, { createdAt: "asc" }],
-      },
-      monthlyResults: {
-        orderBy: [{ year: "desc" }, { month: "desc" }],
-      },
-    },
-    orderBy: {
-      createdAt: "asc",
-    },
-  });
-
-  const summaries = users.map((user) => buildDashboardUser(user, monthPolicies, viewerUserId));
   const currentMonth = getCurrentMonthPeriod();
 
   return {
@@ -684,15 +758,26 @@ function buildHistoryRows(displayMode: TrackingDisplayMode, timeline: ResolvedWe
 
 export async function getUserProfilePayload(userId: string, viewerUserId: string): Promise<UserProfilePayload | null> {
   await syncUserMonthlyResults(userId);
-  const monthPolicies = buildMonthPolicyMap(
-    await prisma.monthPolicy.findMany({
+  const [monthPolicyRecords, userMonthPolicyRecords] = await Promise.all([
+    prisma.monthPolicy.findMany({
       select: {
         month: true,
         year: true,
         requiredTargetPct: true,
       },
     }),
-  );
+    prisma.userMonthPolicy.findMany({
+      where: { userId },
+      select: {
+        userId: true,
+        month: true,
+        year: true,
+        requiredTargetPct: true,
+      },
+    }),
+  ]);
+  const monthPolicies = buildMonthPolicyMap(monthPolicyRecords);
+  const userMonthPolicies = buildUserMonthPolicyMap(userMonthPolicyRecords);
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -711,7 +796,7 @@ export async function getUserProfilePayload(userId: string, viewerUserId: string
   }
 
   const tracking = buildTrackingState(user, viewerUserId);
-  const summary = buildDashboardUser(user, monthPolicies, viewerUserId);
+  const summary = buildDashboardUser(user, monthPolicies, userMonthPolicies, viewerUserId);
   const bmi = buildBmiSummary(user, tracking);
 
   const monthlyResults: ProfileMonthlyResult[] = user.monthlyResults.map((result) => {
@@ -765,23 +850,41 @@ export async function getUserProfilePayload(userId: string, viewerUserId: string
 
 export async function getAdminPayload() {
   await syncAllMonthlyResults();
-  const monthPolicies = await prisma.monthPolicy.findMany({
-    orderBy: [{ year: "asc" }, { month: "asc" }],
-  });
+  const [monthPolicies, userMonthPolicies, users] = await Promise.all([
+    prisma.monthPolicy.findMany({
+      orderBy: [{ year: "asc" }, { month: "asc" }],
+    }),
+    prisma.userMonthPolicy.findMany({
+      orderBy: [{ year: "desc" }, { month: "desc" }],
+      select: {
+        id: true,
+        userId: true,
+        month: true,
+        year: true,
+        requiredTargetPct: true,
+      },
+    }),
+    prisma.user.findMany({
+      include: {
+        weightEntries: {
+          orderBy: [{ date: "asc" }, { createdAt: "asc" }],
+        },
+        monthlyResults: {
+          orderBy: [{ year: "desc" }, { month: "desc" }],
+        },
+      },
+      orderBy: {
+        createdAt: "asc",
+      },
+    }),
+  ]);
+  const userMonthPoliciesByUser = new Map<string, UserMonthPolicySummary[]>();
 
-  const users = await prisma.user.findMany({
-    include: {
-      weightEntries: {
-        orderBy: [{ date: "asc" }, { createdAt: "asc" }],
-      },
-      monthlyResults: {
-        orderBy: [{ year: "desc" }, { month: "desc" }],
-      },
-    },
-    orderBy: {
-      createdAt: "asc",
-    },
-  });
+  for (const policy of userMonthPolicies) {
+    const policies = userMonthPoliciesByUser.get(policy.userId) ?? [];
+    policies.push(policy);
+    userMonthPoliciesByUser.set(policy.userId, policies);
+  }
 
   const adminUsers: AdminUserSummary[] = users.map((user) => {
     if (!isParticipantUser(user)) {
@@ -808,6 +911,7 @@ export async function getAdminPayload() {
         claimCode: user.claimCode,
         needsStartingWeight: false,
         adminCanTogglePrivacy: false,
+        personalMonthPolicies: [],
       };
     }
 
@@ -836,6 +940,7 @@ export async function getAdminPayload() {
       claimCode: user.claimCode,
       needsStartingWeight: user.isPrivate && user.startWeight === null,
       adminCanTogglePrivacy: user.passwordHash === null,
+      personalMonthPolicies: userMonthPoliciesByUser.get(user.id) ?? [],
     };
   });
 

@@ -57,6 +57,20 @@ function isFutureDate(date: Date) {
   return date.getTime() > getMaxAllowedDate().getTime();
 }
 
+function parseValidMonthInput(value: string) {
+  if (!/^\d{4}-\d{2}$/.test(value)) {
+    return null;
+  }
+
+  const [year, month] = value.split("-").map(Number);
+
+  if (!Number.isInteger(year) || !Number.isInteger(month) || year < 1 || month < 1 || month > 12) {
+    return null;
+  }
+
+  return { year, month };
+}
+
 export async function createParticipantProfileAction(
   _previousState: ActionState,
   formData: FormData,
@@ -587,6 +601,103 @@ export async function updateChallengeStartDateAction(formData: FormData) {
   });
 
   refreshAdminViews(userId);
+}
+
+export async function upsertUserMonthPolicyAction(formData: FormData) {
+  await requireAdminSession();
+
+  const userId = `${formData.get("userId") ?? ""}`;
+  const monthValue = `${formData.get("month") ?? ""}`;
+  const requiredTargetPct = Number(formData.get("requiredTargetPct"));
+  const period = parseValidMonthInput(monthValue);
+  const normalizedPct = Math.round(requiredTargetPct);
+
+  if (
+    !userId
+    || !period
+    || !Number.isFinite(requiredTargetPct)
+    || !Number.isInteger(requiredTargetPct)
+    || requiredTargetPct < 1
+    || requiredTargetPct > 200
+  ) {
+    return;
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      isParticipant: true,
+    },
+  });
+
+  if (!user?.isParticipant) {
+    return;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    if (normalizedPct === 100) {
+      await tx.userMonthPolicy.deleteMany({
+        where: {
+          userId,
+          month: period.month,
+          year: period.year,
+        },
+      });
+    } else {
+      await tx.userMonthPolicy.upsert({
+        where: {
+          userId_month_year: {
+            userId,
+            month: period.month,
+            year: period.year,
+          },
+        },
+        update: {
+          requiredTargetPct: normalizedPct,
+        },
+        create: {
+          userId,
+          month: period.month,
+          year: period.year,
+          requiredTargetPct: normalizedPct,
+        },
+      });
+    }
+
+    await syncUserMonthlyResults(userId, tx);
+  });
+
+  refreshAdminViews(userId);
+}
+
+export async function deleteUserMonthPolicyAction(formData: FormData) {
+  await requireAdminSession();
+
+  const policyId = `${formData.get("policyId") ?? ""}`;
+
+  if (!policyId) {
+    return;
+  }
+
+  const policy = await prisma.userMonthPolicy.findUnique({
+    where: { id: policyId },
+    select: {
+      userId: true,
+    },
+  });
+
+  if (!policy) {
+    return;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.userMonthPolicy.deleteMany({
+      where: { id: policyId },
+    });
+    await syncUserMonthlyResults(policy.userId, tx);
+  });
+
+  refreshAdminViews(policy.userId);
 }
 
 export async function upsertMonthPolicyAction(formData: FormData) {

@@ -18,6 +18,14 @@ export interface MonthPolicySummary {
   requiredTargetPct: number;
 }
 
+export interface UserMonthPolicySummary {
+  id: string;
+  userId: string;
+  month: number;
+  year: number;
+  requiredTargetPct: number;
+}
+
 export interface DashboardUserSummary {
   id: string;
   name: string;
@@ -131,6 +139,7 @@ export interface AdminUserSummary {
   claimCode: string | null;
   needsStartingWeight: boolean;
   adminCanTogglePrivacy: boolean;
+  personalMonthPolicies: UserMonthPolicySummary[];
 }
 
 export interface AdminEntrySummary {
