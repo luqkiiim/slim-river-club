@@ -8,11 +8,12 @@ import { formatPercentage } from "@/lib/weight-utils";
 interface CompletionRingProps {
   compact?: boolean;
   label: string;
+  mini?: boolean;
   progressPct: number;
   value: string;
 }
 
-export function CompletionRing({ compact = false, label, progressPct, value }: CompletionRingProps) {
+export function CompletionRing({ compact = false, label, mini = false, progressPct, value }: CompletionRingProps) {
   const clampedProgress = Math.min(Math.max(progressPct, 0), 100);
   const complete = progressPct >= 100;
 
@@ -22,7 +23,7 @@ export function CompletionRing({ compact = false, label, progressPct, value }: C
       aria-valuemax={100}
       aria-valuemin={0}
       aria-valuenow={Math.round(clampedProgress)}
-      className={`relative mx-auto aspect-square w-full ${compact ? "max-w-[176px]" : "max-w-[260px]"}`}
+      className={`relative mx-auto aspect-square w-full ${mini ? "max-w-[48px]" : compact ? "max-w-[176px]" : "max-w-[260px]"}`}
       role="progressbar"
     >
       <div aria-hidden className="absolute inset-0">
@@ -47,7 +48,8 @@ export function CompletionRing({ compact = false, label, progressPct, value }: C
           </RadialBarChart>
         </ResponsiveContainer>
       </div>
-      <div className="absolute inset-[20%] flex flex-col items-center justify-center rounded-full bg-cream/85 text-center">
+      <div className={`absolute flex items-center justify-center rounded-full bg-cream/85 text-center ${mini ? "inset-[15%]" : "inset-[20%] flex-col"}`}>
+        {mini ? <strong className="text-[10px] font-semibold tracking-tight text-ink">{value}</strong> : <>
         <span className={`${compact ? "text-[11px]" : "text-xs"} font-semibold uppercase tracking-[0.16em] text-moss`}>{label}</span>
         <strong className={`${compact ? "text-xl sm:text-2xl" : "text-3xl"} mt-1 font-semibold tracking-tight text-ink`}>{value}</strong>
         <span
@@ -57,6 +59,7 @@ export function CompletionRing({ compact = false, label, progressPct, value }: C
         >
           <Check aria-hidden size={compact ? 18 : 23} weight="bold" />
         </span>
+        </>}
       </div>
     </div>
   );

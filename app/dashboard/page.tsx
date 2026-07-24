@@ -150,7 +150,7 @@ function GroupMomentum({ group, currentMonthLabel }: { group: GroupSummary; curr
   return (
     <section
       aria-labelledby="group-momentum-title"
-      className="my-3 overflow-hidden rounded-[24px] border border-black/[0.05] bg-sage/65 bg-[url('/assets/warm-paper-texture.webp')] bg-cover bg-right p-3.5 sm:my-6 sm:p-6"
+      className="my-3 overflow-hidden rounded-[24px] border border-black/[0.05] bg-cream/80 p-3.5 sm:my-6 sm:p-6"
     >
       <div className="flex items-end justify-between gap-4">
         <div>
