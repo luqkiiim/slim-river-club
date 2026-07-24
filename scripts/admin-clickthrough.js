@@ -17,6 +17,12 @@ const progressPath = path.join(process.cwd(), ".tmp-admin-clickthrough.log");
 const serverOutPath = path.join(process.cwd(), ".tmp-admin-clickthrough.server.out.log");
 const serverErrPath = path.join(process.cwd(), ".tmp-admin-clickthrough.server.err.log");
 const userDataDir = path.join(process.cwd(), `.tmp-admin-clickthrough-browser-${timestamp}`);
+const mobileViewport = {
+  width: 390,
+  height: 844,
+  deviceScaleFactor: 3,
+  mobile: true,
+};
 
 const seedPrefix = `Admin QA ${timestamp}`;
 const now = new Date();
@@ -211,11 +217,16 @@ async function setupPage(client, sessionId) {
   await client.send("Page.setLifecycleEventsEnabled", { enabled: true }, sessionId);
   await client.send(
     "Emulation.setDeviceMetricsOverride",
+    mobileViewport,
+    sessionId,
+  );
+  await client.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 }, sessionId);
+  await client.send(
+    "Emulation.setUserAgentOverride",
     {
-      width: 1440,
-      height: 1100,
-      deviceScaleFactor: 1,
-      mobile: false,
+      userAgent:
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+      platform: "iPhone",
     },
     sessionId,
   );
@@ -284,7 +295,7 @@ async function waitForText(client, sessionId, text, timeoutMs = 30000) {
     async () => {
       const hasText = await evaluate(
         client,
-        `document.body.innerText.replace(/\\s+/g, " ").includes(${JSON.stringify(text)})`,
+        `document.body.innerText.replace(/\\s+/g, " ").toLocaleLowerCase().includes(${JSON.stringify(text.toLocaleLowerCase())})`,
         sessionId,
       );
 
@@ -304,7 +315,7 @@ async function waitForTextGone(client, sessionId, text, timeoutMs = 30000) {
     async () => {
       const hasText = await evaluate(
         client,
-        `document.body.innerText.replace(/\\s+/g, " ").includes(${JSON.stringify(text)})`,
+        `document.body.innerText.replace(/\\s+/g, " ").toLocaleLowerCase().includes(${JSON.stringify(text.toLocaleLowerCase())})`,
         sessionId,
       );
 
@@ -316,21 +327,6 @@ async function waitForTextGone(client, sessionId, text, timeoutMs = 30000) {
     },
     timeoutMs,
     `text gone ${text}`,
-  );
-}
-
-async function hasVisibleText(client, sessionId, text) {
-  return evaluate(
-    client,
-    `(() => {
-      const normalize = (value) => value.replace(/\\s+/g, ' ').trim();
-      const isVisible = (node) => !!node && node instanceof HTMLElement && node.offsetParent !== null;
-
-      return Array.from(document.querySelectorAll('body *')).some(
-        (node) => isVisible(node) && normalize(node.innerText || node.textContent || '') === ${JSON.stringify(text)},
-      );
-    })()`,
-    sessionId,
   );
 }
 
@@ -596,29 +592,65 @@ async function submitFormWithOverrides(client, sessionId, submitText, overrides)
 }
 
 async function clickByText(client, sessionId, text) {
+  return waitFor(
+    () =>
+      evaluate(
+        client,
+        `(() => {
+          const normalize = (value) => value.replace(/\\s+/g, ' ').trim();
+          const isVisible = (node) => !!node && node instanceof HTMLElement && node.offsetParent !== null;
+          const candidates = Array.from(document.querySelectorAll('button, a, summary'));
+          const exactTarget = candidates.find(
+            (node) => isVisible(node) && normalize(node.innerText || node.textContent || '') === ${JSON.stringify(text)},
+          );
+          const target =
+            exactTarget ??
+            candidates.find((node) => {
+              if (!isVisible(node)) {
+                return false;
+              }
+
+              const label = normalize(node.innerText || node.textContent || '');
+
+              return label.startsWith(${JSON.stringify(`${text} `)});
+            });
+
+          if (!target) {
+            throw new Error('Clickable element not found: ' + ${JSON.stringify(text)});
+          }
+
+          target.click();
+          return true;
+        })()`,
+        sessionId,
+      ),
+    15000,
+    `clickable text ${text}`,
+  );
+}
+
+async function clickByAccessibleName(client, sessionId, role, name) {
   return evaluate(
     client,
     `(() => {
-      const normalize = (value) => value.replace(/\\s+/g, ' ').trim();
-      const isVisible = (node) => !!node && node instanceof HTMLElement && node.offsetParent !== null;
-      const candidates = Array.from(document.querySelectorAll('button, a, summary'));
-      const exactTarget = candidates.find(
-        (node) => isVisible(node) && normalize(node.innerText || node.textContent || '') === ${JSON.stringify(text)},
-      );
-      const target =
-        exactTarget ??
-        candidates.find((node) => {
-          if (!isVisible(node)) {
-            return false;
-          }
-
-          const label = normalize(node.innerText || node.textContent || '');
-
-          return label.startsWith(${JSON.stringify(`${text} `)});
-        });
+      const normalize = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+      const isVisible = (node) => {
+        if (!(node instanceof HTMLElement)) return false;
+        const style = getComputedStyle(node);
+        const rect = node.getBoundingClientRect();
+        return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+      };
+      const selector =
+        ${JSON.stringify(role)} === 'button'
+          ? 'button, [role="button"]'
+          : '[role="' + ${JSON.stringify(role)} + '"]';
+      const target = Array.from(document.querySelectorAll(selector)).find((node) => {
+        const accessibleName = normalize(node.getAttribute('aria-label') || node.textContent);
+        return isVisible(node) && accessibleName === ${JSON.stringify(name)};
+      });
 
       if (!target) {
-        throw new Error('Clickable element not found: ' + ${JSON.stringify(text)});
+        throw new Error('Visible ' + ${JSON.stringify(role)} + ' not found with name ' + ${JSON.stringify(name)});
       }
 
       target.click();
@@ -626,6 +658,124 @@ async function clickByText(client, sessionId, text) {
     })()`,
     sessionId,
   );
+}
+
+async function waitForNoVisibleDialog(client, sessionId, timeoutMs = 10000) {
+  return waitFor(
+    async () => {
+      const hasDialog = await evaluate(
+        client,
+        `Array.from(document.querySelectorAll('[role="dialog"][aria-modal="true"]')).some(
+          (dialog) => dialog instanceof HTMLElement && dialog.offsetParent !== null,
+        )`,
+        sessionId,
+      );
+
+      if (!hasDialog) return true;
+      throw new Error("A modal dialog is still visible");
+    },
+    timeoutMs,
+    "dialog closed",
+  );
+}
+
+async function closeOpenDialog(client, sessionId) {
+  await evaluate(
+    client,
+    `(() => {
+      const dialog = Array.from(document.querySelectorAll('[role="dialog"][aria-modal="true"]')).find(
+        (node) => node instanceof HTMLElement && node.offsetParent !== null,
+      );
+      const closeButton = dialog
+        ? Array.from(dialog.querySelectorAll('button')).find((button) =>
+            button instanceof HTMLElement &&
+            button.offsetParent !== null &&
+            String(button.getAttribute('aria-label') || '').startsWith('Close'),
+          )
+        : null;
+
+      if (!closeButton) throw new Error('Visible dialog close button not found');
+      closeButton.click();
+      return true;
+    })()`,
+    sessionId,
+  );
+  await waitForNoVisibleDialog(client, sessionId);
+}
+
+async function inspectParticipantEditor(client, sessionId) {
+  return evaluate(
+    client,
+    `(() => {
+      const normalize = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+      const dialog = Array.from(document.querySelectorAll('[role="dialog"][aria-modal="true"]')).find(
+        (node) => node instanceof HTMLElement && node.offsetParent !== null,
+      );
+      const tablist = dialog
+        ? Array.from(dialog.querySelectorAll('[role="tablist"]')).find((node) =>
+            String(node.getAttribute('aria-label') || '').endsWith('editor sections'),
+          )
+        : null;
+      const tabs = tablist ? Array.from(tablist.querySelectorAll('[role="tab"]')) : [];
+      const selected = tabs.find((tab) => tab.getAttribute('aria-selected') === 'true');
+      const closeButton = dialog
+        ? Array.from(dialog.querySelectorAll('button')).find(
+            (button) => button.getAttribute('aria-label') === 'Close participant editor',
+          )
+        : null;
+
+      return {
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+        hasHorizontalOverflow: document.documentElement.scrollWidth > window.innerWidth + 2,
+        hasDialog: Boolean(dialog),
+        closeName: closeButton?.getAttribute('aria-label') || null,
+        tabNames: tabs.map((tab) => normalize(tab.textContent)),
+        selectedTab: selected ? normalize(selected.textContent) : null,
+      };
+    })()`,
+    sessionId,
+  );
+}
+
+async function waitForParticipantEditor(client, sessionId) {
+  return waitFor(
+    async () => {
+      const state = await inspectParticipantEditor(client, sessionId);
+      const isExpected =
+        state.viewportWidth === mobileViewport.width &&
+        state.viewportHeight === mobileViewport.height &&
+        !state.hasHorizontalOverflow &&
+        state.hasDialog &&
+        state.closeName === "Close participant editor" &&
+        JSON.stringify(state.tabNames) === JSON.stringify(["Overview", "Targets", "History"]) &&
+        state.selectedTab === "Overview";
+
+      if (isExpected) return state;
+      throw new Error(`Participant editor state ${JSON.stringify(state)}`);
+    },
+    10000,
+    "mobile participant editor",
+  );
+}
+
+async function selectParticipantEditorTab(client, sessionId, name) {
+  await clickByAccessibleName(client, sessionId, "tab", name);
+
+  return waitFor(
+    async () => {
+      const state = await inspectParticipantEditor(client, sessionId);
+      if (state.selectedTab === name) return state;
+      throw new Error(`Participant editor selected tab ${JSON.stringify(state)}`);
+    },
+    10000,
+    `participant editor ${name} tab`,
+  );
+}
+
+async function closeParticipantEditor(client, sessionId) {
+  await clickByAccessibleName(client, sessionId, "button", "Close participant editor");
+  await waitForNoVisibleDialog(client, sessionId);
 }
 
 async function clickInArticle(client, sessionId, articleText, actionText) {
@@ -941,40 +1091,6 @@ async function cleanupDatabase() {
   });
 }
 
-async function ensurePendingParticipantExistsViaFallback() {
-  const existing = await prisma.user.findFirst({
-    where: {
-      name: seeded.pendingPrivateName,
-    },
-    select: {
-      id: true,
-    },
-  });
-
-  if (existing) {
-    return existing.id;
-  }
-
-  const created = await prisma.user.create({
-    data: {
-      name: seeded.pendingPrivateName,
-      email: null,
-      passwordHash: null,
-      claimCode: `AUTO-${String(timestamp).slice(-4)}`,
-      isPrivate: true,
-      isParticipant: true,
-      isAdmin: false,
-      heightCm: 165,
-      targetLossKg: 6.25,
-      monthlyLossTargetKg: 2,
-      monthlyPenaltyRm: 45,
-      challengeStartDate: createUtcDateDaysAgo(14),
-    },
-  });
-
-  return created.id;
-}
-
 async function runClickthrough(client, sessionId) {
   const steps = [];
   const warnings = [];
@@ -1013,6 +1129,8 @@ async function runClickthrough(client, sessionId) {
     await setFieldValue(client, sessionId, "password", seeded.adminPassword);
     await submitFormByButtonText(client, sessionId, "Log in");
     await waitForPath(client, sessionId, "/dashboard");
+    await waitForText(client, sessionId, "Group momentum");
+    await waitForText(client, sessionId, "Admin");
     await clickByText(client, sessionId, "Admin");
     await waitForPath(client, sessionId, "/admin");
     await waitForText(client, sessionId, "Club workspace");
@@ -1020,6 +1138,24 @@ async function runClickthrough(client, sessionId) {
   });
 
   await recordStep("participants tab default state", async () => {
+    const mobileState = await evaluate(
+      client,
+      `({
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+        hasHorizontalOverflow: document.documentElement.scrollWidth > window.innerWidth + 2,
+      })`,
+      sessionId,
+    );
+
+    if (
+      mobileState.viewportWidth !== mobileViewport.width ||
+      mobileState.viewportHeight !== mobileViewport.height ||
+      mobileState.hasHorizontalOverflow
+    ) {
+      throw new Error(`Admin mobile layout failed: ${JSON.stringify(mobileState)}`);
+    }
+
     await waitForText(client, sessionId, "Participants");
     await waitForText(client, sessionId, seeded.publicName);
     await waitForText(client, sessionId, seeded.adminOnlyName);
@@ -1052,6 +1188,8 @@ async function runClickthrough(client, sessionId) {
     });
 
     await clickInArticle(client, sessionId, seeded.publicName, "Manage");
+    await waitForParticipantEditor(client, sessionId);
+    await selectParticipantEditorTab(client, sessionId, "Targets");
     await waitForText(client, sessionId, "Personal month targets");
     await submitFormWithOverrides(client, sessionId, "Save personal rule", {
       month: "2097-10",
@@ -1076,8 +1214,10 @@ async function runClickthrough(client, sessionId) {
     }
 
     await navigateTo(client, sessionId, `${baseUrl}/admin`);
-    await clickByText(client, sessionId, "Participants");
+    await clickByText(client, sessionId, "People");
     await clickInArticle(client, sessionId, seeded.publicName, "Manage");
+    await waitForParticipantEditor(client, sessionId);
+    await selectParticipantEditorTab(client, sessionId, "Targets");
     await waitForText(client, sessionId, "Personal month targets");
     await submitFormWithOverrides(client, sessionId, "Save personal rule", {
       month: "2026-00",
@@ -1107,26 +1247,26 @@ async function runClickthrough(client, sessionId) {
       },
     });
     await navigateTo(client, sessionId, `${baseUrl}/admin`);
-    await clickByText(client, sessionId, "Participants");
+    await clickByText(client, sessionId, "People");
   });
 
   await recordStep("create pending private participant", async () => {
     await clickByText(client, sessionId, "Add participant");
     await waitForText(client, sessionId, "Add participant");
-    await setFieldValueInForm(client, sessionId, "Create", "name", seeded.pendingPrivateName);
-    await setFieldValueInForm(client, sessionId, "Create", "privacyMode", "private");
+    await setFieldValueInForm(client, sessionId, "Create participant", "name", seeded.pendingPrivateName);
+    await setFieldValueInForm(client, sessionId, "Create participant", "privacyMode", "private");
     await waitForFieldVisible(client, sessionId, "targetLossKg");
-    await setFieldValueInForm(client, sessionId, "Create", "monthlyPenaltyRm", "45");
-    await setFieldValueInForm(client, sessionId, "Create", "challengeStartDate", privateChallengeStartValue);
-    await setFieldValueInForm(client, sessionId, "Create", "heightCm", "165");
-    await setFieldValueInForm(client, sessionId, "Create", "targetLossKg", "6.25");
-    const diagnostics = await getFormDiagnostics(client, sessionId, "Create");
+    await setFieldValueInForm(client, sessionId, "Create participant", "monthlyPenaltyRm", "45");
+    await setFieldValueInForm(client, sessionId, "Create participant", "challengeStartDate", privateChallengeStartValue);
+    await setFieldValueInForm(client, sessionId, "Create participant", "heightCm", "165");
+    await setFieldValueInForm(client, sessionId, "Create participant", "targetLossKg", "6.25");
+    const diagnostics = await getFormDiagnostics(client, sessionId, "Create participant");
 
     if (diagnostics.invalidFields.length > 0) {
       throw new Error(`Create form invalid: ${JSON.stringify(diagnostics.invalidFields)}`);
     }
 
-    await submitFormByButtonText(client, sessionId, "Create");
+    await submitFormByButtonText(client, sessionId, "Create participant");
     await delay(2500);
     const bodyText = await evaluate(
       client,
@@ -1140,12 +1280,11 @@ async function runClickthrough(client, sessionId) {
 
     if (bodyText.includes("Latest claim code")) {
       await waitForText(client, sessionId, "Copy code");
+      await clickByText(client, sessionId, "Back to workspace");
+      await waitForNoVisibleDialog(client, sessionId);
     } else {
       warnings.push("Create participant completed without keeping the claim code visible in the modal; the workspace refreshed back to the admin page.");
-    }
-
-    if (await hasVisibleText(client, sessionId, "x")) {
-      await clickByText(client, sessionId, "x");
+      await closeOpenDialog(client, sessionId);
     }
   });
 
@@ -1159,8 +1298,7 @@ async function runClickthrough(client, sessionId) {
   });
 
   if (!pendingParticipant) {
-    warnings.push("Add participant did not create a pending profile through the browser flow. A fallback pending profile was seeded directly so the rest of the admin clickthrough could continue.");
-    await ensurePendingParticipantExistsViaFallback();
+    throw new Error("Add participant did not create the expected pending profile through the browser flow.");
   }
 
   await recordStep("claim queue shows pending participant", async () => {
@@ -1174,6 +1312,8 @@ async function runClickthrough(client, sessionId) {
 
   await recordStep("pending participant private update works", async () => {
     await clickInArticle(client, sessionId, seeded.pendingPrivateName, "Manage");
+    await waitForParticipantEditor(client, sessionId);
+    await selectParticipantEditorTab(client, sessionId, "History");
     await waitForText(client, sessionId, "History and backfill");
     await setFieldValueInForm(client, sessionId, "Add update", "lossKg", "1.25");
     await setFieldValueInForm(client, sessionId, "Add update", "date", privateUpdateValue);
@@ -1206,23 +1346,18 @@ async function runClickthrough(client, sessionId) {
     });
 
     if (!pendingEntry) {
-      warnings.push("Adding a private progress update did not create the expected DB row through the browser flow. A fallback entry was seeded so the rest of the workspace could still be checked.");
-      await prisma.weightEntry.create({
-        data: {
-          userId: pendingUser.id,
-          entryType: "LOSS_DELTA",
-          lossKg: 1.25,
-          weight: null,
-          date: privateUpdateDate,
-        },
-      });
+      throw new Error("Adding a private progress update did not create the expected database row.");
     }
 
     await navigateTo(client, sessionId, `${baseUrl}/admin`);
+    await waitForText(client, sessionId, "Claims");
     await clickByText(client, sessionId, "Claims");
     await waitForText(client, sessionId, seeded.pendingPrivateName);
     await clickInArticle(client, sessionId, seeded.pendingPrivateName, "Manage");
+    await waitForParticipantEditor(client, sessionId);
+    await selectParticipantEditorTab(client, sessionId, "History");
     await waitForText(client, sessionId, "1.25 kg");
+    await selectParticipantEditorTab(client, sessionId, "Targets");
     await setFieldValueInForm(client, sessionId, "Save personal rule", "month", "2098-11");
     await setFieldValueInForm(client, sessionId, "Save personal rule", "requiredTargetPct", "60");
     await submitFormByButtonText(client, sessionId, "Save personal rule");
@@ -1254,8 +1389,11 @@ async function runClickthrough(client, sessionId) {
     );
 
     await navigateTo(client, sessionId, `${baseUrl}/admin`);
+    await waitForText(client, sessionId, "Claims");
     await clickByText(client, sessionId, "Claims");
     await clickInArticle(client, sessionId, seeded.pendingPrivateName, "Manage");
+    await waitForParticipantEditor(client, sessionId);
+    await selectParticipantEditorTab(client, sessionId, "Targets");
     await waitForText(client, sessionId, "November 2098");
     await waitForText(client, sessionId, "Personal 60% · 1.2 kg required");
     await submitFormByHiddenValue(client, sessionId, "policyId", privatePolicy.id, "Remove");
@@ -1281,15 +1419,17 @@ async function runClickthrough(client, sessionId) {
       "private participant month rule removal",
     );
 
-    await clickByText(client, sessionId, "x");
+    await closeParticipantEditor(client, sessionId);
   });
 
   await recordStep("public participant add and delete entry", async () => {
     await navigateTo(client, sessionId, `${baseUrl}/admin`);
-    await clickByText(client, sessionId, "Participants");
+    await clickByText(client, sessionId, "People");
     await waitForText(client, sessionId, seeded.publicName);
     await clickInArticle(client, sessionId, seeded.publicName, "Manage");
-    await waitForText(client, sessionId, "Rules and penalties");
+    await waitForParticipantEditor(client, sessionId);
+    await selectParticipantEditorTab(client, sessionId, "History");
+    await waitForText(client, sessionId, "History and backfill");
     await setFieldValueInForm(client, sessionId, "Add entry", "weight", "82.75");
     await setFieldValueInForm(client, sessionId, "Add entry", "date", publicEntryValue);
     await submitFormByButtonText(client, sessionId, "Add entry");
@@ -1308,7 +1448,7 @@ async function runClickthrough(client, sessionId) {
       throw new Error("Seeded public participant disappeared before add-entry verification.");
     }
 
-    let publicEntry = await prisma.weightEntry.findFirst({
+    const publicEntry = await prisma.weightEntry.findFirst({
       where: {
         userId: publicUser.id,
         entryType: "ABSOLUTE",
@@ -1321,25 +1461,15 @@ async function runClickthrough(client, sessionId) {
     });
 
     if (!publicEntry) {
-      warnings.push("Adding a public weight entry did not create the expected DB row through the browser flow. A fallback entry was seeded so delete and history rendering could still be checked.");
-      publicEntry = await prisma.weightEntry.create({
-        data: {
-          userId: publicUser.id,
-          entryType: "ABSOLUTE",
-          weight: 82.75,
-          lossKg: null,
-          date: publicEntryDate,
-        },
-        select: {
-          id: true,
-        },
-      });
+      throw new Error("Adding a public weight entry did not create the expected database row.");
     }
 
     await navigateTo(client, sessionId, `${baseUrl}/admin`);
-    await clickByText(client, sessionId, "Participants");
+    await clickByText(client, sessionId, "People");
     await waitForText(client, sessionId, seeded.publicName);
     await clickInArticle(client, sessionId, seeded.publicName, "Manage");
+    await waitForParticipantEditor(client, sessionId);
+    await selectParticipantEditorTab(client, sessionId, "History");
     await waitForText(client, sessionId, "82.75 kg");
     await enableConfirmOverride(client, sessionId);
     await submitFormByHiddenValue(client, sessionId, "entryId", publicEntry.id, "Delete entry");
@@ -1355,24 +1485,23 @@ async function runClickthrough(client, sessionId) {
     });
 
     if (persistedEntry) {
-      warnings.push("Deleting a public weight entry did not remove the expected DB row through the browser flow. The fallback entry was removed directly so the remaining checks could continue.");
-      await prisma.weightEntry.delete({
-        where: {
-          id: publicEntry.id,
-        },
-      });
+      throw new Error("Deleting a public weight entry did not remove the expected database row.");
     }
 
     await navigateTo(client, sessionId, `${baseUrl}/admin`);
-    await clickByText(client, sessionId, "Participants");
+    await clickByText(client, sessionId, "People");
     await waitForText(client, sessionId, seeded.publicName);
     await clickInArticle(client, sessionId, seeded.publicName, "Manage");
+    await waitForParticipantEditor(client, sessionId);
+    await selectParticipantEditorTab(client, sessionId, "History");
     await waitForTextGone(client, sessionId, "82.75 kg");
-    await clickByText(client, sessionId, "x");
+    await closeParticipantEditor(client, sessionId);
   });
 
   await recordStep("closed personal month target recalculates the participant only", async () => {
     await clickInArticle(client, sessionId, seeded.publicName, "Manage");
+    await waitForParticipantEditor(client, sessionId);
+    await selectParticipantEditorTab(client, sessionId, "Targets");
     await waitForText(client, sessionId, "Personal month targets");
     await setFieldValueInForm(client, sessionId, "Save personal rule", "month", "2026-02");
     await setFieldValueInForm(client, sessionId, "Save personal rule", "requiredTargetPct", "75");
@@ -1445,8 +1574,10 @@ async function runClickthrough(client, sessionId) {
     );
 
     await navigateTo(client, sessionId, `${baseUrl}/admin`);
-    await clickByText(client, sessionId, "Participants");
+    await clickByText(client, sessionId, "People");
     await clickInArticle(client, sessionId, seeded.publicName, "Manage");
+    await waitForParticipantEditor(client, sessionId);
+    await selectParticipantEditorTab(client, sessionId, "Targets");
     await waitForText(client, sessionId, "February 2026");
     await submitFormByHiddenValue(client, sessionId, "policyId", discounted.policy.id, "Remove");
 
@@ -1495,26 +1626,26 @@ async function runClickthrough(client, sessionId) {
       "closed personal month target fallback",
     );
 
-    await clickByText(client, sessionId, "x");
+    await closeParticipantEditor(client, sessionId);
   });
 
   await recordStep("admin-only editor opens", async () => {
     await clickInArticle(client, sessionId, seeded.adminOnlyName, "Manage");
-    await waitForText(client, sessionId, "Management account");
+    await waitForText(client, sessionId, "Admin-only");
     await waitForText(client, sessionId, "Role");
-    await clickByText(client, sessionId, "x");
+    await closeOpenDialog(client, sessionId);
     await delay(1000);
   });
 
   await recordStep("group and personal month rules add and remove work", async () => {
-    await clickByText(client, sessionId, "Settings");
+    await clickByText(client, sessionId, "Rules");
     await waitForText(client, sessionId, "Month rules");
     await setFieldValueInForm(client, sessionId, "Save rule", "month", seeded.futureMonth);
     await setFieldValueInForm(client, sessionId, "Save rule", "requiredTargetPct", "50");
     await submitFormByButtonText(client, sessionId, "Save rule");
     await delay(2500);
 
-    let monthPolicy = await prisma.monthPolicy.findFirst({
+    const monthPolicy = await prisma.monthPolicy.findFirst({
       where: {
         year: 2099,
         month: 12,
@@ -1525,22 +1656,14 @@ async function runClickthrough(client, sessionId) {
     });
 
     if (!monthPolicy) {
-      warnings.push("Saving a month rule did not create the expected DB row through the browser flow. A fallback month rule was created directly so the settings UI could still be checked.");
-      monthPolicy = await prisma.monthPolicy.create({
-        data: {
-          year: 2099,
-          month: 12,
-          requiredTargetPct: 50,
-        },
-        select: {
-          id: true,
-        },
-      });
+      throw new Error("Saving a month rule did not create the expected database row.");
     }
 
     await navigateTo(client, sessionId, `${baseUrl}/admin`);
-    await clickByText(client, sessionId, "Participants");
+    await clickByText(client, sessionId, "People");
     await clickInArticle(client, sessionId, seeded.publicName, "Manage");
+    await waitForParticipantEditor(client, sessionId);
+    await selectParticipantEditorTab(client, sessionId, "Targets");
     await waitForText(client, sessionId, "Personal month targets");
     await setFieldValueInForm(client, sessionId, "Save personal rule", "month", seeded.futureMonth);
     await setFieldValueInForm(client, sessionId, "Save personal rule", "requiredTargetPct", "75");
@@ -1574,8 +1697,10 @@ async function runClickthrough(client, sessionId) {
     );
 
     await navigateTo(client, sessionId, `${baseUrl}/admin`);
-    await clickByText(client, sessionId, "Participants");
+    await clickByText(client, sessionId, "People");
     await clickInArticle(client, sessionId, seeded.publicName, "Manage");
+    await waitForParticipantEditor(client, sessionId);
+    await selectParticipantEditorTab(client, sessionId, "Targets");
     await waitForText(client, sessionId, seeded.futureMonthLabel);
     await waitForText(client, sessionId, "Personal 75% · 1.5 kg required");
     await waitForText(client, sessionId, "Overrides the 50% group rule");
@@ -1606,16 +1731,18 @@ async function runClickthrough(client, sessionId) {
     );
 
     await navigateTo(client, sessionId, `${baseUrl}/admin`);
-    await clickByText(client, sessionId, "Participants");
+    await clickByText(client, sessionId, "People");
     await clickInArticle(client, sessionId, seeded.publicName, "Manage");
+    await waitForParticipantEditor(client, sessionId);
+    await selectParticipantEditorTab(client, sessionId, "Targets");
     await waitForTextGone(client, sessionId, seeded.futureMonthLabel);
-    await clickByText(client, sessionId, "x");
+    await closeParticipantEditor(client, sessionId);
 
     await navigateTo(client, sessionId, `${baseUrl}/admin`);
-    await clickByText(client, sessionId, "Settings");
+    await clickByText(client, sessionId, "Rules");
     await waitForText(client, sessionId, seeded.futureMonthLabel);
     await submitFormByHiddenValue(client, sessionId, "policyId", monthPolicy.id, "Remove");
-    await delay(2500);
+    await waitForTextGone(client, sessionId, seeded.futureMonthLabel, 60000);
 
     const remainingPolicy = await prisma.monthPolicy.findUnique({
       where: {
@@ -1627,23 +1754,18 @@ async function runClickthrough(client, sessionId) {
     });
 
     if (remainingPolicy) {
-      warnings.push("Removing a month rule did not delete the expected DB row through the browser flow. The fallback rule was removed directly so the settings tab could still be verified.");
-      await prisma.monthPolicy.delete({
-        where: {
-          id: monthPolicy.id,
-        },
-      });
+      throw new Error("Removing a month rule did not delete the expected database row.");
     }
 
-    await navigateTo(client, sessionId, `${baseUrl}/admin`);
-    await clickByText(client, sessionId, "Settings");
-    await waitForTextGone(client, sessionId, seeded.futureMonthLabel);
   });
 
   await recordStep("dashboard and sign out still work", async () => {
-    await clickByText(client, sessionId, "Back to dashboard");
+    await clickByText(client, sessionId, "Dashboard");
     await waitForPath(client, sessionId, "/dashboard");
-    await waitForText(client, sessionId, "Slim River Club");
+    await waitForNoAppError(client, sessionId);
+    await waitForText(client, sessionId, "Group momentum");
+    await clickByText(client, sessionId, "More");
+    await waitForText(client, sessionId, "Account");
     await clickByText(client, sessionId, "Sign out");
     await waitForPath(client, sessionId, "/login");
     await waitForText(client, sessionId, "Log in");

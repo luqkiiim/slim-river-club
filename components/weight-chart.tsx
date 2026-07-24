@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import {
   CartesianGrid,
   Line,
@@ -22,46 +23,86 @@ interface WeightChartProps {
 }
 
 export function WeightChart({ mode, points, startValue, targetValue }: WeightChartProps) {
+  const chartTitleId = useId();
+  const chartSummaryId = useId();
+
   if (points.length === 0) {
     return (
-      <div className="panel flex min-h-72 items-center justify-center p-6 text-center text-sm text-ink/60">
-        {mode === "weight"
-          ? "No weight history yet. Log your first weigh-in to see the chart."
-          : "No progress history yet. Add an update to see the chart."}
-      </div>
+      <section className="panel p-5 sm:p-6" aria-labelledby={chartTitleId}>
+        <h2 id={chartTitleId} className="text-lg font-semibold [font-family:var(--font-heading)]">
+          {mode === "weight" ? "Weight trend" : "Progress trend"}
+        </h2>
+        <div className="mt-4 rounded-2xl border border-dashed border-black/10 px-4 py-8 text-center text-sm text-ink/70">
+          {mode === "weight"
+            ? "No weight history yet. Log your first weigh-in to see the chart."
+            : "No progress history yet. Add an update to see the chart."}
+        </div>
+      </section>
     );
   }
 
+  const chartLabel = mode === "weight" ? "Recorded weight" : "Total weight lost";
   const pointValues = points.map((point) => point.value);
+  const firstPoint = points[0];
+  const latestPoint = points[points.length - 1];
   const lowerBound = Math.min(...pointValues, startValue ?? pointValues[0], targetValue ?? pointValues[0]);
   const upperBound = Math.max(...pointValues, startValue ?? pointValues[0], targetValue ?? pointValues[0]);
   const yAxisDomain = lowerBound === upperBound ? [lowerBound - 1, upperBound + 1] : [lowerBound, upperBound];
   const showStartGuide = startValue !== null;
   const showTargetGuide = targetValue !== null && targetValue !== startValue;
+  const summary = `${chartLabel} changed from ${formatWeight(firstPoint.value)} on ${firstPoint.date} to ${formatWeight(
+    latestPoint.value,
+  )} on ${latestPoint.date}.`;
 
   return (
-    <div className="panel p-5 sm:p-6">
-      <div className="mb-4">
-        <h2 className="text-lg font-semibold [font-family:var(--font-heading)]">
-          {mode === "weight" ? "Weight chart" : "Progress chart"}
+    <figure className="panel p-5 sm:p-6" aria-labelledby={chartTitleId} aria-describedby={chartSummaryId}>
+      <div>
+        <h2 id={chartTitleId} className="text-lg font-semibold [font-family:var(--font-heading)]">
+          {mode === "weight" ? "Weight trend" : "Progress trend"}
         </h2>
-        <p className="text-sm text-ink/65">
-          {mode === "weight"
-            ? "X axis is date, Y axis is weight."
-            : "X axis is date, Y axis is total kg lost."}
-        </p>
       </div>
+      <figcaption id={chartSummaryId} className="mb-4 mt-1 text-sm leading-6 text-ink/70">
+        {summary}
+      </figcaption>
 
-      <div className="h-72 w-full">
+      <ul aria-label="Chart legend" className="mb-3 flex flex-wrap gap-x-4 gap-y-2 text-xs font-medium text-ink/70">
+        <li className="flex items-center gap-2">
+          <span aria-hidden="true" className="h-1 w-5 rounded-full bg-leaf" />
+          {chartLabel}
+        </li>
+        {showStartGuide ? (
+          <li className="flex items-center gap-2">
+            <span aria-hidden="true" className="w-5 border-t-2 border-dashed border-ink/35" />
+            Start {formatWeight(startValue)}
+          </li>
+        ) : null}
+        {showTargetGuide ? (
+          <li className="flex items-center gap-2">
+            <span aria-hidden="true" className="w-5 border-t-2 border-dashed border-[#b8872f]" />
+            Target {formatWeight(targetValue)}
+          </li>
+        ) : null}
+      </ul>
+
+      <div aria-hidden="true" className="h-64 w-full sm:h-72">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={points} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
+          <LineChart data={points} margin={{ top: 8, right: 8, left: -8, bottom: 8 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(31, 42, 31, 0.08)" />
-            <XAxis dataKey="date" tick={{ fill: "#516151", fontSize: 12 }} />
+            <XAxis
+              axisLine={false}
+              dataKey="date"
+              minTickGap={24}
+              tick={{ fill: "#516151", fontSize: 12 }}
+              tickLine={false}
+            />
             <YAxis
+              axisLine={false}
               type="number"
               domain={yAxisDomain}
               tick={{ fill: "#516151", fontSize: 12 }}
               tickFormatter={(value: number) => `${value}kg`}
+              tickLine={false}
+              width={54}
             />
             {showStartGuide ? (
               <ReferenceLine y={startValue!} stroke="rgba(31,42,31,0.28)" strokeDasharray="6 6" ifOverflow="extendDomain" />
@@ -80,6 +121,7 @@ export function WeightChart({ mode, points, startValue, targetValue }: WeightCha
             <Line
               type="monotone"
               dataKey="value"
+              name={chartLabel}
               stroke="#4d8b5b"
               strokeWidth={3}
               dot={{ r: 4, fill: "#274235" }}
@@ -88,6 +130,24 @@ export function WeightChart({ mode, points, startValue, targetValue }: WeightCha
           </LineChart>
         </ResponsiveContainer>
       </div>
-    </div>
+
+      <table className="sr-only">
+        <caption>{`${chartLabel} chart data`}</caption>
+        <thead>
+          <tr>
+            <th scope="col">Date</th>
+            <th scope="col">{mode === "weight" ? "Weight" : "Total lost"}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {points.map((point, index) => (
+            <tr key={`${point.date}-${point.value}-${index}`}>
+              <td>{point.date}</td>
+              <td>{formatWeight(point.value)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </figure>
   );
 }

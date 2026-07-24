@@ -29,6 +29,8 @@ const seeded = {
   adminEmail: `mobile-dashboard-admin-${timestamp}@example.com`,
   adminPassword: "TempPass123!",
   adminName: `Mobile QA Admin ${timestamp}`,
+  publicEmail: `mobile-dashboard-public-${timestamp}@example.com`,
+  publicPassword: "SomePass123!",
   publicName: `Mobile QA Public ${timestamp}`,
   privateName: `Mobile QA Private ${timestamp}`,
 };
@@ -243,6 +245,321 @@ async function closeTarget(client, targetId) {
   await client.send("Target.closeTarget", { targetId }).catch(() => null);
 }
 
+async function waitForPath(client, sessionId, pathname, timeoutMs = 30000) {
+  return waitFor(
+    async () => {
+      const state = await evaluate(
+        client,
+        "({ pathname: location.pathname, readyState: document.readyState })",
+        sessionId,
+      );
+
+      if (state?.pathname === pathname && state.readyState === "complete") {
+        return state;
+      }
+
+      throw new Error(`Current page state ${JSON.stringify(state)}`);
+    },
+    timeoutMs,
+    `path ${pathname}`,
+  );
+}
+
+async function clickByRoleAndName(client, sessionId, role, name) {
+  return evaluate(
+    client,
+    `(() => {
+      const normalize = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+      const isVisible = (node) => {
+        if (!(node instanceof HTMLElement)) return false;
+        const style = getComputedStyle(node);
+        const rect = node.getBoundingClientRect();
+        return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+      };
+      const selector =
+        ${JSON.stringify(role)} === 'button'
+          ? 'button, [role="button"]'
+          : ${JSON.stringify(role)} === 'link'
+            ? 'a[href], [role="link"]'
+            : '[role="' + ${JSON.stringify(role)} + '"]';
+      const target = Array.from(document.querySelectorAll(selector)).find((node) => {
+        const accessibleName = normalize(node.getAttribute('aria-label') || node.textContent);
+        return isVisible(node) && accessibleName === ${JSON.stringify(name)};
+      });
+
+      if (!target) {
+        throw new Error('Visible ' + ${JSON.stringify(role)} + ' not found with name ' + ${JSON.stringify(name)});
+      }
+
+      target.click();
+      return true;
+    })()`,
+    sessionId,
+  );
+}
+
+async function auditMobilePage(client, sessionId, expectedActiveNav) {
+  return evaluate(
+    client,
+    `(() => {
+      const normalize = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+      const visible = (node) => {
+        if (!(node instanceof HTMLElement)) return false;
+        const style = getComputedStyle(node);
+        const rect = node.getBoundingClientRect();
+        return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+      };
+      const describe = (node) => {
+        const rect = node.getBoundingClientRect();
+        return {
+          tag: node.tagName.toLowerCase(),
+          name: normalize(node.getAttribute('aria-label') || node.textContent).slice(0, 100),
+          width: Math.round(rect.width * 100) / 100,
+          height: Math.round(rect.height * 100) / 100,
+        };
+      };
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const nav = document.querySelector('nav[aria-label="Primary"]');
+      const activeNavItems = nav
+        ? Array.from(nav.querySelectorAll('[aria-current="page"]')).filter(visible)
+        : [];
+      const controlSelector = [
+        'button',
+        'input:not([type="hidden"])',
+        'select',
+        'textarea',
+        '[role="tab"]',
+        'nav[aria-label="Primary"] a[href]',
+      ].join(',');
+      const smallControls = Array.from(document.querySelectorAll(controlSelector))
+        .filter(visible)
+        .filter((node) => {
+          const rect = node.getBoundingClientRect();
+          return rect.width < 44 || rect.height < 44;
+        })
+        .map(describe);
+      const undersizedInputs = Array.from(
+        document.querySelectorAll('input:not([type="hidden"]), select, textarea'),
+      )
+        .filter(visible)
+        .filter((node) => Number.parseFloat(getComputedStyle(node).fontSize) < 16)
+        .map((node) => ({
+          ...describe(node),
+          fontSize: getComputedStyle(node).fontSize,
+        }));
+      const overflowOffenders = Array.from(document.querySelectorAll('body *'))
+        .filter(visible)
+        .map((node) => {
+          const rect = node.getBoundingClientRect();
+          return {
+            ...describe(node),
+            left: Math.round(rect.left * 100) / 100,
+            right: Math.round(rect.right * 100) / 100,
+          };
+        })
+        .filter((item) => item.left < -2 || item.right > viewportWidth + 2)
+        .slice(0, 10);
+      const logWeightTrigger = Array.from(document.querySelectorAll('button')).find(
+        (node) =>
+          visible(node) &&
+          normalize(node.getAttribute('aria-label') || node.textContent) === 'Log weight',
+      );
+      const triggerRect = logWeightTrigger?.getBoundingClientRect();
+      const navRect = nav?.getBoundingClientRect();
+
+      return {
+        path: location.pathname,
+        viewportWidth,
+        viewportHeight,
+        documentWidth: document.documentElement.scrollWidth,
+        hasHorizontalOverflow: document.documentElement.scrollWidth > viewportWidth + 2,
+        overflowOffenders,
+        hasPrimaryNav: Boolean(nav && visible(nav)),
+        activeNavNames: activeNavItems.map((node) =>
+          normalize(node.getAttribute('aria-label') || node.textContent),
+        ),
+        expectedActiveNav: ${JSON.stringify(expectedActiveNav)},
+        smallControls,
+        undersizedInputs,
+        hasLogWeightTrigger: Boolean(logWeightTrigger),
+        logWeightOverlapsNav: Boolean(
+          triggerRect &&
+          navRect &&
+          triggerRect.bottom > navRect.top + 1 &&
+          triggerRect.top < navRect.bottom - 1
+        ),
+        logWeightTrigger: logWeightTrigger ? describe(logWeightTrigger) : null,
+      };
+    })()`,
+    sessionId,
+  );
+}
+
+function assertMobilePage(result, { expectLogWeight = true } = {}) {
+  const issues = [];
+
+  if (result.viewportWidth !== mobileViewport.width || result.viewportHeight !== mobileViewport.height) {
+    issues.push(`viewport is ${result.viewportWidth}x${result.viewportHeight}`);
+  }
+  if (result.hasHorizontalOverflow) {
+    issues.push(`horizontal overflow: ${JSON.stringify(result.overflowOffenders)}`);
+  }
+  if (!result.hasPrimaryNav) {
+    issues.push("primary bottom navigation is missing");
+  }
+  if (
+    result.activeNavNames.length !== 1 ||
+    result.activeNavNames[0] !== result.expectedActiveNav
+  ) {
+    issues.push(
+      `expected one active ${result.expectedActiveNav} nav item, got ${JSON.stringify(result.activeNavNames)}`,
+    );
+  }
+  if (result.smallControls.length > 0) {
+    issues.push(`controls below 44px: ${JSON.stringify(result.smallControls)}`);
+  }
+  if (result.undersizedInputs.length > 0) {
+    issues.push(`inputs below 16px: ${JSON.stringify(result.undersizedInputs)}`);
+  }
+  if (expectLogWeight && !result.hasLogWeightTrigger) {
+    issues.push("Log weight trigger is missing");
+  }
+  if (expectLogWeight && result.logWeightOverlapsNav) {
+    issues.push("Log weight trigger overlaps the bottom navigation");
+  }
+
+  if (issues.length > 0) {
+    throw new Error(`Mobile page audit failed:\n- ${issues.join("\n- ")}`);
+  }
+}
+
+async function auditWeightDialog(client, sessionId) {
+  return evaluate(
+    client,
+    `(() => {
+      const visible = (node) => {
+        if (!(node instanceof HTMLElement)) return false;
+        const style = getComputedStyle(node);
+        const rect = node.getBoundingClientRect();
+        return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+      };
+      const normalize = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+      const dialog = document.querySelector('[role="dialog"][aria-modal="true"]');
+      const labelledBy = dialog?.getAttribute('aria-labelledby');
+      const describedBy = dialog?.getAttribute('aria-describedby');
+      const controls = dialog
+        ? Array.from(dialog.querySelectorAll('button, input:not([type="hidden"]), select, textarea')).filter(visible)
+        : [];
+
+      return {
+        hasDialog: Boolean(dialog && visible(dialog)),
+        hasAccessibleTitle: Boolean(labelledBy && document.getElementById(labelledBy)),
+        hasAccessibleDescription: Boolean(describedBy && document.getElementById(describedBy)),
+        focusInsideDialog: Boolean(dialog && document.activeElement && dialog.contains(document.activeElement)),
+        focusedControl: normalize(
+          document.activeElement?.getAttribute?.('aria-label') ||
+          document.activeElement?.getAttribute?.('name') ||
+          document.activeElement?.textContent,
+        ),
+        smallControls: controls
+          .filter((node) => {
+            const rect = node.getBoundingClientRect();
+            return rect.width < 44 || rect.height < 44;
+          })
+          .map((node) => {
+            const rect = node.getBoundingClientRect();
+            return {
+              name: normalize(node.getAttribute('aria-label') || node.getAttribute('name') || node.textContent),
+              width: Math.round(rect.width * 100) / 100,
+              height: Math.round(rect.height * 100) / 100,
+            };
+          }),
+        undersizedInputs: controls
+          .filter((node) => node.matches('input, select, textarea'))
+          .filter((node) => Number.parseFloat(getComputedStyle(node).fontSize) < 16)
+          .map((node) => ({
+            name: node.getAttribute('name'),
+            fontSize: getComputedStyle(node).fontSize,
+          })),
+      };
+    })()`,
+    sessionId,
+  );
+}
+
+function assertWeightDialog(result) {
+  const issues = [];
+
+  if (!result.hasDialog) issues.push("semantic modal dialog is missing");
+  if (!result.hasAccessibleTitle) issues.push("dialog has no accessible title");
+  if (!result.hasAccessibleDescription) issues.push("dialog has no accessible description");
+  if (!result.focusInsideDialog || result.focusedControl !== "weight") {
+    issues.push(`initial focus is not on the weight field: ${result.focusedControl || "none"}`);
+  }
+  if (result.smallControls.length > 0) {
+    issues.push(`dialog controls below 44px: ${JSON.stringify(result.smallControls)}`);
+  }
+  if (result.undersizedInputs.length > 0) {
+    issues.push(`dialog inputs below 16px: ${JSON.stringify(result.undersizedInputs)}`);
+  }
+
+  if (issues.length > 0) {
+    throw new Error(`Weight dialog audit failed:\n- ${issues.join("\n- ")}`);
+  }
+}
+
+async function pressEscape(client, sessionId) {
+  const keyEvent = {
+    key: "Escape",
+    code: "Escape",
+    windowsVirtualKeyCode: 27,
+    nativeVirtualKeyCode: 27,
+  };
+
+  await client.send("Input.dispatchKeyEvent", { ...keyEvent, type: "keyDown" }, sessionId);
+  await client.send("Input.dispatchKeyEvent", { ...keyEvent, type: "keyUp" }, sessionId);
+}
+
+async function selectProfileTab(client, sessionId, name) {
+  await clickByRoleAndName(client, sessionId, "tab", name);
+
+  return waitFor(
+    async () => {
+      const state = await evaluate(
+        client,
+        `(() => {
+          const normalize = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+          const tablist = document.querySelector('[role="tablist"][aria-label="Profile sections"]');
+          const tabs = tablist ? Array.from(tablist.querySelectorAll('[role="tab"]')) : [];
+          const selected = tabs.find((tab) => tab.getAttribute('aria-selected') === 'true');
+          const panel = document.querySelector('[role="tabpanel"]');
+
+          return {
+            names: tabs.map((tab) => normalize(tab.textContent)),
+            selected: selected ? normalize(selected.textContent) : null,
+            panelLabelledBy: panel?.getAttribute('aria-labelledby') || null,
+            selectedId: selected?.id || null,
+          };
+        })()`,
+        sessionId,
+      );
+
+      if (
+        JSON.stringify(state?.names) === JSON.stringify(["Overview", "History", "Rules"]) &&
+        state?.selected === name &&
+        state.panelLabelledBy === state.selectedId
+      ) {
+        return state;
+      }
+
+      throw new Error(`Profile tab state ${JSON.stringify(state)}`);
+    },
+    10000,
+    `profile tab ${name}`,
+  );
+}
+
 function parseCookieHeader(cookieHeader) {
   const segments = cookieHeader.split(";").map((part) => part.trim());
   const [nameValue, ...attributeParts] = segments;
@@ -388,11 +705,11 @@ async function seedDatabase() {
   const privateStart = createUtcDateDaysAgo(42);
   const privateRecent = createUtcDateDaysAgo(3);
 
-  await prisma.user.create({
+  const publicUser = await prisma.user.create({
     data: {
       name: seeded.publicName,
-      email: `mobile-dashboard-public-${timestamp}@example.com`,
-      passwordHash: hashSync("SomePass123!", 10),
+      email: seeded.publicEmail,
+      passwordHash: hashSync(seeded.publicPassword, 10),
       isParticipant: true,
       isPrivate: false,
       startWeight: 86.5,
@@ -449,7 +766,10 @@ async function seedDatabase() {
     },
   });
 
-  return admin.id;
+  return {
+    adminId: admin.id,
+    publicUserId: publicUser.id,
+  };
 }
 
 async function cleanupDatabase() {
@@ -475,7 +795,7 @@ async function main() {
 
   try {
     await cleanupDatabase();
-    await seedDatabase();
+    const { publicUserId } = await seedDatabase();
     server = await ensureServerReady();
 
     browser = spawn(
@@ -502,79 +822,70 @@ async function main() {
     client = new CDPClient(browserInfo.webSocketDebuggerUrl);
     await client.waitForOpen();
 
-    const cookies = await createSessionCookies(seeded.adminEmail, seeded.adminPassword);
+    const cookies = await createSessionCookies(seeded.publicEmail, seeded.publicPassword);
     await applySessionCookies(client, cookies);
 
     const { targetId, sessionId } = await createPage(client, `${baseUrl}/dashboard`);
+    await waitForPath(client, sessionId, "/dashboard");
+    await delay(1500);
+
+    const dashboardAudit = await auditMobilePage(client, sessionId, "Home");
+    assertMobilePage(dashboardAudit);
+
+    await clickByRoleAndName(client, sessionId, "button", "Log weight");
+    const dialogAudit = await waitFor(
+      async () => {
+        const audit = await auditWeightDialog(client, sessionId);
+        if (audit.hasDialog && audit.focusInsideDialog) return audit;
+        throw new Error(`Dialog state ${JSON.stringify(audit)}`);
+      },
+      10000,
+      "weight dialog focus",
+    );
+    assertWeightDialog(dialogAudit);
+
+    await pressEscape(client, sessionId);
     await waitFor(
       async () => {
         const state = await evaluate(
           client,
-          "({ path: location.pathname, readyState: document.readyState })",
+          `(() => {
+            const normalize = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+            const dialog = document.querySelector('[role="dialog"][aria-modal="true"]');
+            const activeName = normalize(
+              document.activeElement?.getAttribute?.('aria-label') ||
+              document.activeElement?.textContent,
+            );
+            return { hasDialog: Boolean(dialog), activeName };
+          })()`,
           sessionId,
         );
 
-        if (state?.path === "/dashboard" && state.readyState === "complete") {
-          return true;
-        }
-
-        throw new Error(`Current state ${JSON.stringify(state)}`);
+        if (!state.hasDialog && state.activeName === "Log weight") return state;
+        throw new Error(`Dialog close state ${JSON.stringify(state)}`);
       },
-      30000,
-      "dashboard ready",
+      10000,
+      "weight dialog Escape close and focus restore",
     );
 
-    await delay(1500);
+    await clickByRoleAndName(client, sessionId, "link", "Progress");
+    await waitForPath(client, sessionId, `/users/${publicUserId}`);
+    await delay(500);
 
-    const result = await evaluate(
-      client,
-      `(() => {
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-        const normalize = (value) => value.replace(/\\s+/g, ' ').trim();
-        const visible = (node) => {
-          const style = getComputedStyle(node);
-          const rect = node.getBoundingClientRect();
-
-          return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
-        };
-
-        const visibleElements = Array.from(document.querySelectorAll('body *')).filter((element) => visible(element));
-        const userCards = Array.from(document.querySelectorAll('article')).filter((article) =>
-          visible(article) && Array.from(article.querySelectorAll('a')).some((link) => normalize(link.textContent || '') === 'View profile'),
-        );
-
-        const overflowOffenders = visibleElements
-          .map((element) => {
-            const rect = element.getBoundingClientRect();
-
-            return {
-              tag: element.tagName.toLowerCase(),
-              text: normalize(element.innerText || element.textContent || '').slice(0, 80),
-              left: Math.round(rect.left * 100) / 100,
-              right: Math.round(rect.right * 100) / 100,
-              width: Math.round(rect.width * 100) / 100,
-            };
-          })
-          .filter((item) => item.left < -2 || item.right > viewportWidth + 2)
-          .slice(0, 10);
-
-        return {
-          path: location.pathname,
-          viewportWidth,
-          viewportHeight,
-          docScrollWidth: document.documentElement.scrollWidth,
-          hasPageHorizontalOverflow: document.documentElement.scrollWidth > viewportWidth + 2,
-          userCardCount: userCards.length,
-          userCardHeights: userCards.map((card) => Math.round(card.getBoundingClientRect().height)),
-          headerHeight: Math.round(document.querySelector('header')?.getBoundingClientRect().height || 0),
-          summaryTileCount: document.querySelectorAll('section .panel').length,
-          overflowOffenders,
-          dashboardTextSample: normalize(document.body.innerText || '').slice(0, 500),
-        };
-      })()`,
-      sessionId,
-    );
+    const profileAudit = await auditMobilePage(client, sessionId, "Progress");
+    assertMobilePage(profileAudit);
+    const overviewTab = await selectProfileTab(client, sessionId, "Overview");
+    const historyTab = await selectProfileTab(client, sessionId, "History");
+    const rulesTab = await selectProfileTab(client, sessionId, "Rules");
+    const result = {
+      status: "passed",
+      dashboard: dashboardAudit,
+      weightDialog: dialogAudit,
+      profile: {
+        layout: profileAudit,
+        tabs: [overviewTab, historyTab, rulesTab],
+      },
+    };
 
     fs.writeFileSync(outputPath, JSON.stringify(result, null, 2));
     console.log(JSON.stringify(result, null, 2));

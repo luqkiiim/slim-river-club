@@ -41,7 +41,7 @@ export function CreateParticipantForm({
       {isStandalone ? (
         <div className="mb-4">
           <h2 className="text-lg font-semibold [font-family:var(--font-heading)]">Create participant</h2>
-          <p className="text-sm text-ink/65">
+          <p className="text-sm text-ink/70">
             Create a profile, backfill the right kind of history now, and share the claim code later.
           </p>
         </div>
@@ -49,17 +49,19 @@ export function CreateParticipantForm({
 
       {state.message ? (
         <div
+          aria-live={state.status === "error" ? "assertive" : "polite"}
           className={`mb-4 rounded-2xl px-4 py-3 text-sm ${
             state.status === "error"
               ? "border border-blush/25 bg-blush/10 text-[#8f4a36]"
               : "border border-leaf/20 bg-leaf/10 text-moss"
           }`}
+          role={state.status === "error" ? "alert" : "status"}
         >
           {state.message}
         </div>
       ) : null}
 
-      <form action={formAction} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <form action={formAction} aria-busy={isPending} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <label className="block space-y-2 text-sm font-medium text-ink">
           <span>Name</span>
           <input className="field" name="name" type="text" autoComplete="off" required />
@@ -114,12 +116,12 @@ export function CreateParticipantForm({
 
         <div className="flex items-end md:col-span-2 xl:col-span-4">
           <button className="primary-button w-full lg:w-auto" type="submit" disabled={isPending}>
-            {isPending ? "Creating..." : "Create"}
+            {isPending ? "Creating participant…" : "Create participant"}
           </button>
         </div>
       </form>
 
-      <div className="mt-4 rounded-2xl border border-black/10 bg-sand/40 px-4 py-4 text-sm text-ink/65">
+      <div className="mt-4 rounded-2xl border border-black/10 bg-sand/40 px-4 py-4 text-sm text-ink/70">
         {privacyMode === "public"
           ? "Public participants start with actual weights. Add height if you want the profile to show a BMI meter later."
           : "Private participants start with target loss only. Admins backfill change logs, and the participant adds the private starting weight after claim."}
@@ -128,7 +130,7 @@ export function CreateParticipantForm({
       {latestClaimCode ? (
         <div className="mt-4 rounded-2xl border border-black/10 bg-sand/40 px-4 py-4">
           <p className="text-sm font-semibold text-ink">Latest claim code</p>
-          <p className="mt-1 text-sm text-ink/65">Send this code to the participant so they can sign up and claim the profile.</p>
+          <p className="mt-1 text-sm text-ink/70">Send this code to the participant so they can sign up and claim the profile.</p>
           <CopyValueField value={latestClaimCode} buttonLabel="Copy code" />
 
           {variant === "embedded" && onClose ? (

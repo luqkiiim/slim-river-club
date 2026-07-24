@@ -1,5 +1,6 @@
 "use client";
 
+import { Trash } from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
@@ -36,10 +37,11 @@ export function DeleteWeightEntryForm({ entryId, userName, entryDate, valueLabel
       <input type="hidden" name="entryId" value={entryId} />
       <button
         type="submit"
-        className="inline-flex w-full items-center justify-center rounded-full bg-[#8f4a36] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#6f3526] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+        className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-[#8f4a36] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#6f3526] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
         disabled={isPending}
       >
-        {isPending ? "Deleting..." : "Delete entry"}
+        <Trash aria-hidden size={18} weight="bold" />
+        {isPending ? "Deleting…" : "Delete entry"}
       </button>
     </form>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import { Trash } from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
@@ -17,7 +18,7 @@ export function DeleteUserForm({ userId, userName, disabled, disabledReason }: D
   const [isPending, startTransition] = useTransition();
 
   if (disabled) {
-    return <p className="text-xs text-ink/45">{disabledReason ?? "This profile cannot be removed."}</p>;
+    return <p className="text-xs text-ink/70">{disabledReason ?? "This profile cannot be removed."}</p>;
   }
 
   return (
@@ -40,10 +41,11 @@ export function DeleteUserForm({ userId, userName, disabled, disabledReason }: D
       <input type="hidden" name="userId" value={userId} />
       <button
         type="submit"
-        className="inline-flex w-full items-center justify-center rounded-full bg-[#8f4a36] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#6f3526] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+        className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-[#8f4a36] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#6f3526] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
         disabled={isPending}
       >
-        {isPending ? "Removing..." : "Remove profile"}
+        <Trash aria-hidden size={18} weight="bold" />
+        {isPending ? "Removing…" : "Remove profile"}
       </button>
     </form>
   );

@@ -5,7 +5,10 @@ dist
 build
 *.log
 *.tsbuildinfo
+.tmp-*.json
+.tmp-*-browser-*/
 .env
+.env*.local
 !.env.example
 dev.db
 dev.db-journal

@@ -10,10 +10,13 @@
     "db:migrations:check": "node --env-file-if-exists=.env scripts/turso-migrations.js --check --force",
     "db:migrations:apply": "node --env-file-if-exists=.env scripts/turso-migrations.js --apply --force",
     "db:migrations:seal": "node scripts/turso-migrations.js --seal",
-    "test:migrations": "node --test scripts/turso-migrations.test.js"
+    "test:migrations": "node --test scripts/turso-migrations.test.js",
+    "test:ui:mobile": "node scripts/dashboard-mobile-check.js",
+    "test:ui:admin": "node scripts/admin-clickthrough.js"
   },
   "dependencies": {
     "@libsql/client": "^0.17.0",
+    "@phosphor-icons/react": "^2.1.10",
     "@prisma/adapter-libsql": "^7.4.2",
     "@prisma/client": "^6.6.0",
     "bcryptjs": "^2.4.3",

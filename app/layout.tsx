@@ -33,7 +33,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#f8f2e8",
+  themeColor: "#FBF8F1",
 };
 
 export default function RootLayout({
@@ -42,14 +42,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${headingFont.className} ${headingFont.variable} ${monoFont.variable} bg-hero-glow text-ink`}>
-        <div className="relative min-h-screen overflow-x-hidden">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-72 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.9),_transparent_60%)]" />
-          <div className="pointer-events-none absolute left-[-8rem] top-20 h-48 w-48 rounded-full bg-leaf/10 blur-3xl" />
-          <div className="pointer-events-none absolute right-[-6rem] top-40 h-56 w-56 rounded-full bg-blush/20 blur-3xl" />
-          {children}
-        </div>
+    <html data-scroll-behavior="smooth" lang="en">
+      <body className={`${headingFont.className} ${headingFont.variable} ${monoFont.variable} text-ink`}>
+        <div className="min-h-screen overflow-x-clip">{children}</div>
       </body>
     </html>
   );

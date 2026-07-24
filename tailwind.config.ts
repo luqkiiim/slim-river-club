@@ -9,19 +9,19 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        sand: "#f6efe4",
-        ink: "#1f2a1f",
-        leaf: "#4d8b5b",
-        moss: "#274235",
-        blush: "#e88f74",
-        cream: "#fffdf8",
+        sand: "#F2EBDD",
+        ink: "#203326",
+        leaf: "#4B7C50",
+        moss: "#2E4D37",
+        blush: "#D97B63",
+        cream: "#FBF8F1",
+        sage: "#E4E8DC",
+        peach: "#F5D8CD",
+        line: "#DED8CC",
       },
       boxShadow: {
-        panel: "0 18px 40px rgba(35, 49, 35, 0.12)",
-      },
-      backgroundImage: {
-        "hero-glow":
-          "radial-gradient(circle at top left, rgba(255, 220, 195, 0.8), transparent 35%), radial-gradient(circle at top right, rgba(128, 181, 144, 0.45), transparent 30%), linear-gradient(180deg, #fffdf8 0%, #f6efe4 100%)",
+        panel: "0 16px 40px rgba(32, 51, 38, 0.08)",
+        float: "0 18px 42px rgba(32, 51, 38, 0.18)",
       },
     },
   },

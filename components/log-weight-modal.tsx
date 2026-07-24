@@ -1,5 +1,6 @@
 "use client";
 
+import { Scales, X } from "@phosphor-icons/react";
 import { useActionState, useEffect, useRef, useState } from "react";
 
 import { logWeightAction } from "@/lib/actions/weight-actions";
@@ -12,6 +13,9 @@ interface LogWeightModalProps {
 
 export function LogWeightModal({ currentUserName }: LogWeightModalProps) {
   const formRef = useRef<HTMLFormElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const weightInputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [dateValue, setDateValue] = useState(currentDateInputValue());
   const [showFeedback, setShowFeedback] = useState(false);
@@ -22,7 +26,47 @@ export function LogWeightModal({ currentUserName }: LogWeightModalProps) {
     if (open) {
       setDateValue(maxDateValue);
       setShowFeedback(false);
+      const previousOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      window.requestAnimationFrame(() => weightInputRef.current?.focus());
+
+      const handleKeyDown = (event: KeyboardEvent) => {
+        if (event.key === "Escape") {
+          setOpen(false);
+          return;
+        }
+
+        if (event.key !== "Tab" || !dialogRef.current) {
+          return;
+        }
+
+        const focusable = Array.from(
+          dialogRef.current.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href]',
+          ),
+        );
+        const first = focusable[0];
+        const last = focusable.at(-1);
+
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
+      };
+
+      document.addEventListener("keydown", handleKeyDown);
+
+      return () => {
+        document.removeEventListener("keydown", handleKeyDown);
+        document.body.style.overflow = previousOverflow;
+        triggerRef.current?.focus();
+      };
     }
+
+    return undefined;
   }, [maxDateValue, open]);
 
   useEffect(() => {
@@ -40,50 +84,86 @@ export function LogWeightModal({ currentUserName }: LogWeightModalProps) {
     }
 
     return undefined;
-  }, [state.status]);
+  }, [state]);
 
   return (
     <>
-      <button
-        type="button"
-        className="fixed bottom-6 right-6 z-20 rounded-full bg-moss px-5 py-4 text-sm font-semibold text-white shadow-[0_18px_35px_rgba(39,66,53,0.28)] transition hover:bg-ink"
-        onClick={() => setOpen(true)}
-      >
-        Log Weight
-      </button>
+      <div className="mx-auto w-full max-w-7xl px-5 pb-[calc(var(--app-bottom-nav-height)+env(safe-area-inset-bottom)+0.75rem)] sm:px-6 lg:pb-8">
+        <button
+          ref={triggerRef}
+          aria-haspopup="dialog"
+          type="button"
+          className="primary-button mx-auto flex w-full max-w-xl shadow-float"
+          onClick={() => setOpen(true)}
+        >
+          <Scales aria-hidden size={22} weight="bold" />
+          Log weight
+        </button>
+      </div>
 
       {open ? (
-        <div className="fixed inset-0 z-30 flex items-end justify-center bg-ink/35 p-4 sm:items-center">
-          <div className="panel w-full max-w-md p-6">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/35 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:items-center sm:p-5">
+          <button
+            aria-label="Dismiss weight entry dialog"
+            className="absolute inset-0 cursor-default"
+            onClick={() => setOpen(false)}
+            type="button"
+          />
+          <div
+            ref={dialogRef}
+            aria-describedby="log-weight-description"
+            aria-labelledby="log-weight-title"
+            aria-modal="true"
+            className="panel relative max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto overscroll-contain p-5 sm:max-h-[calc(100dvh-2.5rem)] sm:p-6"
+            role="dialog"
+          >
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-moss">Official weigh-in day is Saturday</p>
-                <h2 className="mt-2 text-2xl font-semibold [font-family:var(--font-heading)]">Log weight</h2>
-                <p className="mt-1 text-sm text-ink/65">
+                <p className="eyebrow">Official weigh-in: Saturday</p>
+                <h2 className="mt-2 text-2xl font-semibold [font-family:var(--font-heading)]" id="log-weight-title">
+                  Log weight
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-ink/70" id="log-weight-description">
                   {currentUserName}, add your latest recorded weight or backfill a past weigh-in.
                 </p>
               </div>
-              <button type="button" className="secondary-button px-4 py-2" onClick={() => setOpen(false)}>
-                Close
+              <button
+                aria-label="Close weight entry dialog"
+                type="button"
+                className="icon-button"
+                onClick={() => setOpen(false)}
+              >
+                <X aria-hidden size={21} weight="bold" />
               </button>
             </div>
 
             {showFeedback && state.message ? (
               <div
+                aria-live={state.status === "error" ? "assertive" : "polite"}
                 className={`mb-4 rounded-2xl px-4 py-3 text-sm ${
                   state.status === "error"
                     ? "border border-blush/25 bg-blush/10 text-[#8f4a36]"
                     : "border border-leaf/20 bg-leaf/10 text-moss"
                 }`}
+                role={state.status === "error" ? "alert" : "status"}
               >
                 {state.message}
               </div>
             ) : null}
 
-            <form ref={formRef} action={formAction} className="space-y-4">
+            <form ref={formRef} action={formAction} aria-busy={isPending} className="space-y-4">
               <label className="block space-y-2 text-sm font-medium text-ink">
                 <span>Weight (kg)</span>
-                <input className="field" name="weight" type="number" step="0.01" min="1" required />
+                <input
+                  ref={weightInputRef}
+                  className="field"
+                  inputMode="decimal"
+                  name="weight"
+                  type="number"
+                  step="0.01"
+                  min="1"
+                  required
+                />
               </label>
 
               <label className="block space-y-2 text-sm font-medium text-ink">
@@ -100,7 +180,7 @@ export function LogWeightModal({ currentUserName }: LogWeightModalProps) {
               </label>
 
               <button className="primary-button w-full" type="submit" disabled={isPending}>
-                {isPending ? "Saving..." : "Submit"}
+                {isPending ? "Saving weight…" : "Save weight"}
               </button>
             </form>
           </div>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Check, Copy } from "@phosphor-icons/react";
+import { useEffect, useRef, useState } from "react";
 
 interface CopyValueFieldProps {
   value: string;
@@ -8,20 +9,54 @@ interface CopyValueFieldProps {
 }
 
 export function CopyValueField({ value, buttonLabel = "Copy" }: CopyValueFieldProps) {
-  const [copied, setCopied] = useState(false);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
+  const resetTimerRef = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (resetTimerRef.current !== null) {
+        window.clearTimeout(resetTimerRef.current);
+      }
+    },
+    [],
+  );
 
   async function handleCopy() {
-    await navigator.clipboard.writeText(value);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1600);
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopyState("copied");
+    } catch {
+      setCopyState("error");
+    }
+
+    if (resetTimerRef.current !== null) {
+      window.clearTimeout(resetTimerRef.current);
+    }
+    resetTimerRef.current = window.setTimeout(() => setCopyState("idle"), 1800);
   }
 
   return (
     <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-      <input className="field min-w-0 flex-1 text-xs" value={value} readOnly />
+      <label className="sr-only" htmlFor={`copy-value-${value}`}>Value to copy</label>
+      <input
+        aria-describedby={`copy-status-${value}`}
+        className="field min-w-0 flex-1 font-mono text-base"
+        id={`copy-value-${value}`}
+        value={value}
+        readOnly
+      />
       <button type="button" className="secondary-button px-4 py-2 text-sm" onClick={handleCopy}>
-        {copied ? "Copied" : buttonLabel}
+        {copyState === "copied" ? <Check aria-hidden size={18} weight="bold" /> : <Copy aria-hidden size={18} weight="bold" />}
+        {copyState === "copied" ? "Copied" : buttonLabel}
       </button>
+      <span
+        aria-live={copyState === "error" ? "assertive" : "polite"}
+        className="sr-only"
+        id={`copy-status-${value}`}
+        role={copyState === "error" ? "alert" : "status"}
+      >
+        {copyState === "copied" ? "Copied to clipboard." : copyState === "error" ? "Could not copy. Select the value manually." : ""}
+      </span>
     </div>
   );
 }

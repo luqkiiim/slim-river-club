@@ -1,6 +1,6 @@
+import { CaretRight, LockSimple } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
 
-import { ProgressBar } from "@/components/progress-bar";
 import { formatMonthlyStatusLabel, formatWeight } from "@/lib/weight-utils";
 import type { DashboardUserSummary, MonthlyStatus } from "@/types/app";
 
@@ -11,138 +11,77 @@ interface UserCardProps {
 }
 
 function statusClasses(status: MonthlyStatus) {
-  if (status === "GOAL REACHED") {
-    return "bg-leaf/15 text-moss";
+  if (status === "GOAL REACHED" || status === "PASSED") {
+    return "text-moss";
   }
 
   if (status === "EXEMPT") {
-    return "bg-sand text-ink/75";
+    return "text-ink/70";
   }
 
-  if (status === "PASSED") {
-    return "bg-[#dbe9dd] text-moss";
-  }
-
-  return "bg-blush/15 text-[#8f4a36]";
+  return "text-[#8F4A36]";
 }
 
-function getCurrentMonthProgressPct(user: DashboardUserSummary) {
-  if (user.monthlyStatus === "EXEMPT") {
-    return 100;
-  }
-
-  if (user.currentMonthRequiredLossKg <= 0) {
-    return 100;
-  }
-
-  return Math.max((user.currentMonthLoss / user.currentMonthRequiredLossKg) * 100, 0);
-}
-
-function buildMonthlyProgressContent(user: DashboardUserSummary, currentMonthLabel: string) {
-  return {
-    title: `${currentMonthLabel} progress`,
-    progressPct: getCurrentMonthProgressPct(user),
-    metrics: [
-      {
-        label: "This month",
-        value: user.currentMonthEntryCount > 0 ? formatWeight(user.currentMonthLoss) : "No updates yet",
-      },
-      {
-        label: "Target",
-        value: user.monthlyStatus === "EXEMPT" ? "Exempt" : formatWeight(user.currentMonthRequiredLossKg),
-      },
-    ] as const,
-  };
-}
-
-function formatCurrentPaceBadge(user: DashboardUserSummary) {
+function formatPace(user: DashboardUserSummary) {
   if (user.currentMonthPaceUnit === "days") {
     const daysLabel = user.currentMonthDaysRemaining === 1 ? "day" : "days";
 
     return `${formatWeight(user.currentMonthPaceAmountKg)} in ${user.currentMonthDaysRemaining} ${daysLabel}`;
   }
 
-  return `${formatWeight(user.currentMonthPaceAmountKg)}/week`;
+  return `${formatWeight(user.currentMonthPaceAmountKg)} per week`;
 }
 
 export function UserCard({ user, currentMonthLabel, isCurrentUser = false }: UserCardProps) {
-  const progressContent = buildMonthlyProgressContent(user, currentMonthLabel);
-  const targetText =
-    user.displayMode === "weight" && user.targetWeight !== null
-      ? `Target ${formatWeight(user.targetWeight)}`
-      : user.targetLossKg !== null
-        ? `Target ${formatWeight(user.targetLossKg)} loss`
-        : "Target not set";
-  const lastLoggedText = user.lastLoggedAt
-    ? `Last logged ${user.lastLoggedAt}`
-    : user.displayMode === "weight"
-      ? "No weigh-ins yet"
-      : "No progress updates yet";
+  const activity = user.currentMonthEntryCount > 0
+    ? `${formatWeight(user.currentMonthLoss)} this month${user.lastLoggedAt ? ` · updated ${user.lastLoggedAt}` : ""}`
+    : `No ${currentMonthLabel} update yet`;
 
   return (
-    <article className="panel p-4 sm:p-5">
-      <div className="mb-4 flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-lg font-semibold [font-family:var(--font-heading)] sm:text-xl">
-              <Link className="underline-offset-4 transition hover:text-moss hover:underline" href={`/users/${user.id}`}>
-                {user.name}
-              </Link>
-            </h3>
+    <article className="border-b border-black/[0.08] last:border-b-0">
+      <Link
+        className="group flex min-h-[76px] items-center gap-3 py-3.5"
+        href={`/users/${user.id}`}
+      >
+        <span
+          aria-hidden
+          className={`grid h-12 w-12 shrink-0 place-items-center rounded-full text-lg font-semibold ${
+            user.personalBest ? "bg-peach text-[#9A4F39]" : "bg-sage text-moss"
+          }`}
+        >
+          {user.name.slice(0, 1).toUpperCase()}
+        </span>
+
+        <span className="min-w-0 flex-1">
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="truncate text-base font-semibold text-ink">{user.name}</span>
             {user.isPrivate ? (
-              <span className="rounded-full bg-sand px-2.5 py-1 text-[11px] font-semibold text-ink/70">Private</span>
-            ) : null}
-            {user.personalBest ? (
-              <span className="rounded-full bg-[#f8d7a7] px-2.5 py-1 text-[11px] font-semibold text-[#8c5b18]">
-                Personal Best
+              <span className="status-chip bg-sand text-ink/70">
+                <LockSimple aria-hidden className="mr-1" size={13} weight="bold" />
+                Private
               </span>
             ) : null}
-          </div>
-        </div>
-        <span className={`status-chip ${statusClasses(user.monthlyStatus)}`}>{formatMonthlyStatusLabel(user.monthlyStatus)}</span>
-      </div>
-
-      <ProgressBar title={progressContent.title} progressPct={progressContent.progressPct} metrics={progressContent.metrics} />
-
-      <div className="mt-4 hidden grid-cols-2 gap-2.5 text-sm sm:grid">
-        <div className="panel-muted p-3">
-          <p className="text-xs uppercase tracking-[0.16em] text-ink/45">
-            {user.displayMode === "weight" ? "Current" : "Total lost"}
-          </p>
-          <p className="mt-2 font-semibold text-ink">
-            {user.displayMode === "weight" && user.currentWeight !== null ? formatWeight(user.currentWeight) : formatWeight(user.kgLost)}
-          </p>
-        </div>
-        <div className="panel-muted p-3">
-          <p className="text-xs uppercase tracking-[0.16em] text-ink/45">
-            {user.displayMode === "weight" ? "Total lost" : "Target loss"}
-          </p>
-          <p className="mt-2 font-semibold text-ink">
-            {user.displayMode === "weight"
-              ? formatWeight(user.kgLost)
-              : user.targetLossKg !== null
-                ? formatWeight(user.targetLossKg)
-                : "Not set"}
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-4 flex flex-col gap-2.5 border-t border-black/5 pt-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink/60">
-          <p className="hidden sm:block">{targetText}</p>
-          <span className="hidden text-ink/35 sm:inline">|</span>
-          <p>{lastLoggedText}</p>
+            {user.personalBest ? (
+              <span className="status-chip bg-[#F8D7A7] text-[#8C5B18]">Personal best</span>
+            ) : null}
+          </span>
+          <span className="mt-1 block truncate text-sm text-ink/70">{activity}</span>
           {isCurrentUser && user.currentMonthRemainingLossKg > 0 ? (
-            <p className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-moss">
-              {formatCurrentPaceBadge(user)}
-            </p>
+            <span className="mt-1 block text-xs font-semibold text-moss">Your pace: {formatPace(user)}</span>
           ) : null}
-          {user.currentMonthTargetPct !== 100 ? <p className="hidden sm:block">{user.currentMonthTargetPct}% month rule</p> : null}
-        </div>
-        <Link className="text-sm font-semibold text-moss underline-offset-4 hover:underline" href={`/users/${user.id}`}>
-          View profile
-        </Link>
-      </div>
+          {user.currentMonthTargetPct !== 100 ? (
+            <span className="mt-1 block text-xs text-ink/70">{user.currentMonthTargetPct}% effective target this month</span>
+          ) : null}
+        </span>
+
+        <span className="shrink-0 text-right">
+          <span className={`block text-sm font-medium ${statusClasses(user.monthlyStatus)}`}>
+            {formatMonthlyStatusLabel(user.monthlyStatus)}
+          </span>
+          <span className="mt-1 hidden text-xs font-semibold text-moss sm:block">View profile</span>
+        </span>
+        <CaretRight aria-hidden className="shrink-0 text-ink/70 transition group-hover:translate-x-0.5 group-hover:text-moss" size={20} />
+      </Link>
     </article>
   );
 }
