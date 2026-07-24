@@ -24,18 +24,13 @@ export function UserCard({ user, currentMonthLabel }: UserCardProps) {
       <Link className="group flex min-h-[76px] items-center gap-3 py-3.5" href={`/users/${user.id}`}>
         <span
           aria-hidden
-          className={`grid h-12 w-12 shrink-0 place-items-center rounded-full text-lg font-semibold ${
-            user.personalBest ? "bg-peach text-[#9A4F39]" : "bg-sage text-moss"
-          }`}
+          className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-sage text-lg font-semibold text-moss"
         >
           {user.name.slice(0, 1).toUpperCase()}
         </span>
 
         <span className="min-w-0 flex-1">
-          <span className="flex flex-wrap items-center gap-2">
-            <span className="truncate text-base font-semibold text-ink">{user.name}</span>
-            {user.personalBest ? <span className="status-chip bg-[#F8D7A7] text-[#8C5B18]">Personal best</span> : null}
-          </span>
+          <span className="block truncate text-base font-semibold text-ink">{user.name}</span>
           <span className="mt-1 block truncate text-sm font-medium text-ink/70">{progressValue}</span>
         </span>
 

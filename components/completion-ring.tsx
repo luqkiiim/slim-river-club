@@ -23,7 +23,7 @@ export function CompletionRing({ compact = false, label, mini = false, progressP
       aria-valuemax={100}
       aria-valuemin={0}
       aria-valuenow={Math.round(clampedProgress)}
-      className={`relative mx-auto aspect-square w-full ${mini ? "max-w-[48px]" : compact ? "max-w-[176px]" : "max-w-[260px]"}`}
+      className={`relative mx-auto aspect-square w-full ${mini ? "max-w-[64px]" : compact ? "max-w-[176px]" : "max-w-[260px]"}`}
       role="progressbar"
     >
       <div aria-hidden className="absolute inset-0">
@@ -40,16 +40,16 @@ export function CompletionRing({ compact = false, label, mini = false, progressP
             <PolarAngleAxis angleAxisId={0} domain={[0, 100]} tick={false} type="number" />
             <RadialBar
               angleAxisId={0}
-              background={{ fill: "#EEE7DB" }}
+              background={{ fill: mini ? "#C9D8C8" : "#EEE7DB" }}
               cornerRadius={18}
               dataKey="progress"
-              fill="#4B7C50"
+              fill={mini ? "#3F7047" : "#4B7C50"}
             />
           </RadialBarChart>
         </ResponsiveContainer>
       </div>
       <div className={`absolute flex items-center justify-center rounded-full bg-cream/85 text-center ${mini ? "inset-[15%]" : "inset-[20%] flex-col"}`}>
-        {mini ? <strong className="text-[10px] font-semibold tracking-tight text-ink">{value}</strong> : <>
+        {mini ? <strong className="text-xs font-semibold tracking-tight text-ink">{value}</strong> : <>
         <span className={`${compact ? "text-[11px]" : "text-xs"} font-semibold uppercase tracking-[0.16em] text-moss`}>{label}</span>
         <strong className={`${compact ? "text-xl sm:text-2xl" : "text-3xl"} mt-1 font-semibold tracking-tight text-ink`}>{value}</strong>
         <span
