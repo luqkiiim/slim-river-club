@@ -4,9 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node --env-file-if-exists=.env scripts/turso-migrations.js --check --build-gate && next build",
     "start": "next start",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "db:migrations:check": "node --env-file-if-exists=.env scripts/turso-migrations.js --check --force",
+    "db:migrations:apply": "node --env-file-if-exists=.env scripts/turso-migrations.js --apply --force",
+    "db:migrations:seal": "node scripts/turso-migrations.js --seal",
+    "test:migrations": "node --test scripts/turso-migrations.test.js"
   },
   "dependencies": {
     "@libsql/client": "^0.17.0",

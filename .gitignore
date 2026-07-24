@@ -4,6 +4,7 @@ coverage
 dist
 build
 *.log
+*.tsbuildinfo
 .env
 !.env.example
 dev.db

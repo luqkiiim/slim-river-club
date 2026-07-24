@@ -35,6 +35,41 @@ NEXTAUTH_URL="http://localhost:3000"
 NEXTAUTH_SECRET="development-secret-change-me"
 ```
 
+## Production database migrations
+
+Prisma migration commands update the local SQLite database only. Production
+uses Turso, so every schema change must follow this release order:
+
+1. Create and validate the Prisma migration locally.
+2. Seal the new migration and Prisma schema together:
+
+   ```bash
+   npm run db:migrations:seal
+   ```
+
+   This refuses to update the schema state unless a newer migration directory
+   exists.
+3. Apply the next migration to Turso:
+
+   ```bash
+   npm run db:migrations:apply -- --migration <migration-directory-name>
+   ```
+
+4. Verify Turso's migration journal, schema state, and committed checksums:
+
+   ```bash
+   npm run db:migrations:check
+   ```
+
+5. Push and deploy only after the check passes.
+
+Production Vercel builds run the same read-only check before `next build`. A
+missing, unfinished, rolled-back, duplicated, modified, or schema-less
+migration fails the new deployment before it can replace the healthy
+production deployment. Recognized preview/development builds skip the gate.
+Local builds check by default and may explicitly opt out with
+`TURSO_MIGRATION_CHECK_LOCAL_SKIP=1`.
+
 ## Notes
 
 - Weight entries are append-only for normal users.

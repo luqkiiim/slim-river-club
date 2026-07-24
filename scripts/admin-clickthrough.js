@@ -542,6 +542,59 @@ async function submitFormByButtonText(client, sessionId, submitText) {
   );
 }
 
+async function submitFormWithOverrides(client, sessionId, submitText, overrides) {
+  return evaluate(
+    client,
+    `(() => {
+      const normalize = (text) => text.replace(/\\s+/g, ' ').trim();
+      const isVisible = (node) => !!node && node instanceof HTMLElement && node.offsetParent !== null;
+      const form = Array.from(document.querySelectorAll('form')).find((node) => {
+        if (!isVisible(node)) {
+          return false;
+        }
+
+        return Array.from(node.querySelectorAll('button, input[type="submit"]')).some(
+          (candidate) => isVisible(candidate) && normalize(candidate.innerText || candidate.textContent || candidate.value || '') === ${JSON.stringify(submitText)},
+        );
+      });
+
+      if (!form) {
+        throw new Error('Form not found for overridden submit: ' + ${JSON.stringify(submitText)});
+      }
+
+      const submitter = Array.from(form.querySelectorAll('button, input[type="submit"]')).find(
+        (candidate) => isVisible(candidate) && normalize(candidate.innerText || candidate.textContent || candidate.value || '') === ${JSON.stringify(submitText)},
+      );
+
+      if (!submitter) {
+        throw new Error('Submitter not found for overridden submit: ' + ${JSON.stringify(submitText)});
+      }
+
+      for (const [name, value] of Object.entries(${JSON.stringify(overrides)})) {
+        const field = Array.from(form.querySelectorAll('[name]')).find(
+          (candidate) => candidate.getAttribute('name') === name,
+        );
+
+        if (!field) {
+          throw new Error('Field not found for overridden submit: ' + name);
+        }
+
+        field.setAttribute('name', name + '__browser_value');
+
+        const override = document.createElement('input');
+        override.type = 'hidden';
+        override.name = name;
+        override.value = String(value);
+        form.appendChild(override);
+      }
+
+      form.requestSubmit(submitter);
+      return true;
+    })()`,
+    sessionId,
+  );
+}
+
 async function clickByText(client, sessionId, text) {
   return evaluate(
     client,
@@ -970,6 +1023,91 @@ async function runClickthrough(client, sessionId) {
     await waitForText(client, sessionId, "Participants");
     await waitForText(client, sessionId, seeded.publicName);
     await waitForText(client, sessionId, seeded.adminOnlyName);
+  });
+
+  await recordStep("personal month rule server validation rejects unsafe values", async () => {
+    const validationUser = await prisma.user.findFirst({
+      where: {
+        name: seeded.publicName,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!validationUser) {
+      throw new Error("Seeded public participant is missing before month-rule validation.");
+    }
+
+    const validationPolicy = await prisma.userMonthPolicy.create({
+      data: {
+        userId: validationUser.id,
+        month: 10,
+        year: 2097,
+        requiredTargetPct: 75,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    await clickInArticle(client, sessionId, seeded.publicName, "Manage");
+    await waitForText(client, sessionId, "Personal month targets");
+    await submitFormWithOverrides(client, sessionId, "Save personal rule", {
+      month: "2097-10",
+      requiredTargetPct: "99.5",
+    });
+    await delay(1000);
+    await waitForNoAppError(client, sessionId);
+
+    const policyAfterFractionalPct = await prisma.userMonthPolicy.findUnique({
+      where: {
+        id: validationPolicy.id,
+      },
+      select: {
+        requiredTargetPct: true,
+      },
+    });
+
+    if (policyAfterFractionalPct?.requiredTargetPct !== 75) {
+      throw new Error(
+        `Fractional target percentage changed the stored policy: ${JSON.stringify(policyAfterFractionalPct)}`,
+      );
+    }
+
+    await navigateTo(client, sessionId, `${baseUrl}/admin`);
+    await clickByText(client, sessionId, "Participants");
+    await clickInArticle(client, sessionId, seeded.publicName, "Manage");
+    await waitForText(client, sessionId, "Personal month targets");
+    await submitFormWithOverrides(client, sessionId, "Save personal rule", {
+      month: "2026-00",
+      requiredTargetPct: "75",
+    });
+    await delay(1000);
+    await waitForNoAppError(client, sessionId);
+
+    const policyAfterMalformedMonth = await prisma.userMonthPolicy.findUnique({
+      where: {
+        id: validationPolicy.id,
+      },
+      select: {
+        requiredTargetPct: true,
+      },
+    });
+
+    if (policyAfterMalformedMonth?.requiredTargetPct !== 75) {
+      throw new Error(
+        `Malformed month changed the stored policy: ${JSON.stringify(policyAfterMalformedMonth)}`,
+      );
+    }
+
+    await prisma.userMonthPolicy.delete({
+      where: {
+        id: validationPolicy.id,
+      },
+    });
+    await navigateTo(client, sessionId, `${baseUrl}/admin`);
+    await clickByText(client, sessionId, "Participants");
   });
 
   await recordStep("create pending private participant", async () => {
