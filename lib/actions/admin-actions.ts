@@ -1,5 +1,6 @@
 "use server";
 
+import { del } from "@vercel/blob";
 import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 
@@ -1133,6 +1134,7 @@ export async function deleteUserProfileAction(formData: FormData) {
     select: {
       id: true,
       isAdmin: true,
+      avatarUrl: true,
     },
   });
 
@@ -1155,6 +1157,10 @@ export async function deleteUserProfileAction(formData: FormData) {
   await prisma.user.delete({
     where: { id: userId },
   });
+
+  if (targetUser.avatarUrl && process.env.BLOB_READ_WRITE_TOKEN) {
+    await del(targetUser.avatarUrl).catch(() => undefined);
+  }
 
   revalidatePath("/dashboard");
   revalidatePath("/admin");

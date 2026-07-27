@@ -1,4 +1,4 @@
 {
-  "latestMigration": "20260724130000_add_user_month_policies",
-  "schemaChecksum": "8fdb9a7432e4ccae8fe60632a3f8e9ebf58773d25a4497f073f7dae06ef5225c"
+  "latestMigration": "20260727153000_add_user_avatar_url",
+  "schemaChecksum": "1d9bd2bee261579133308d4037b0b8ff8b9c43ae5ed6055f53d82543fd66a9bd"
 }

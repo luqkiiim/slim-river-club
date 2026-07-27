@@ -30,6 +30,11 @@ export interface UtcMonthPeriod {
   end: Date;
 }
 
+export interface WeeklyCheckInPeriod {
+  start: Date;
+  end: Date;
+}
+
 export function roundTo(value: number, decimals = 2) {
   const factor = 10 ** decimals;
 
@@ -172,6 +177,37 @@ export function getCurrentAppDateAtNoon(now = new Date()) {
   const { year, month, day } = getDatePartsInAppTimeZone(now);
 
   return new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+}
+
+export function getCurrentWeeklyCheckInPeriod(now = new Date()): WeeklyCheckInPeriod {
+  const appDate = getCurrentAppDateAtNoon(now);
+  const daysSinceSaturday = (appDate.getUTCDay() + 1) % 7;
+  const start = new Date(appDate);
+  start.setUTCDate(start.getUTCDate() - daysSinceSaturday);
+  start.setUTCHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 7);
+
+  return { start, end };
+}
+
+export function isWeeklyCheckInPending(
+  challengeStartDate: Date,
+  entryDates: Date[],
+  now = new Date(),
+) {
+  if (
+    getCurrentAppDateAtNoon(challengeStartDate).getTime() >
+    getCurrentAppDateAtNoon(now).getTime()
+  ) {
+    return false;
+  }
+
+  const period = getCurrentWeeklyCheckInPeriod(now);
+
+  return !entryDates.some(
+    (date) => date.getTime() >= period.start.getTime() && date.getTime() < period.end.getTime(),
+  );
 }
 
 export function calculateKgLost(startWeight: number, currentWeight: number) {

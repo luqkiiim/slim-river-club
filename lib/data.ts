@@ -26,6 +26,7 @@ import {
   getTotalKgLostBefore,
   getTotalKgLostOnOrBefore,
   isLatestWeightPersonalBest,
+  isWeeklyCheckInPending,
   roundTo,
   type ResolvedWeightEntry,
 } from "@/lib/weight-utils";
@@ -412,10 +413,16 @@ function buildDashboardUser(
     currentMonth,
     monthlyStatus,
   });
+  const weeklyCheckInPending = isWeeklyCheckInPending(
+    tracking.challengeStartDate,
+    user.weightEntries.map((entry) => entry.date),
+  );
 
   return {
     id: user.id,
     name: user.name,
+    avatarUrl: user.avatarUrl,
+    weeklyCheckInPending,
     email: user.email,
     isPrivate: user.isPrivate,
     displayMode: tracking.displayMode,
@@ -769,6 +776,18 @@ export async function canParticipantLogWeight(userId: string) {
   return Boolean(user?.isParticipant && (!user.isPrivate || user.startWeight !== null));
 }
 
+export async function getAppChromeUser(userId: string) {
+  return prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      avatarUrl: true,
+      isParticipant: true,
+      isPrivate: true,
+      startWeight: true,
+    },
+  });
+}
+
 export async function getUserProfilePayload(userId: string, viewerUserId: string): Promise<UserProfilePayload | null> {
   await syncUserMonthlyResults(userId);
   const [monthPolicyRecords, userMonthPolicyRecords] = await Promise.all([
@@ -840,6 +859,7 @@ export async function getUserProfilePayload(userId: string, viewerUserId: string
 
   return {
     user: summary,
+    canEditAvatar: user.id === viewerUserId && user.passwordHash !== null,
     displayMode: tracking.displayMode,
     canManagePrivacy: user.id === viewerUserId && user.passwordHash !== null,
     canEditStartingWeight: user.id === viewerUserId && user.passwordHash !== null && user.isPrivate,
@@ -904,6 +924,7 @@ export async function getAdminPayload() {
       return {
         id: user.id,
         name: user.name,
+        avatarUrl: null,
         email: user.email,
         isAdmin: user.isAdmin,
         isParticipant: false,
@@ -933,6 +954,7 @@ export async function getAdminPayload() {
     return {
       id: user.id,
       name: user.name,
+      avatarUrl: user.avatarUrl,
       email: user.email,
       isAdmin: user.isAdmin,
       isParticipant: true,

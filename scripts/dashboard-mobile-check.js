@@ -888,6 +888,11 @@ async function main() {
           visibleNames: expectedNames.filter((name) => cardText.some((text) => text.includes(name))),
           disclosureText,
           hasShowAllControl: disclosureText.some((text) => /^Show all \\d+ participants$/i.test(text)),
+          pendingNames: expectedNames.filter((name) => {
+            const card = cards.find((item) => normalize(item.textContent).includes(name));
+            return card && normalize(card.textContent).includes('Weekly check-in pending');
+          }),
+          hasCheckInLegend: normalize(section?.textContent).includes('Check-in due'),
         };
       })()`,
       sessionId,
@@ -897,7 +902,10 @@ async function main() {
       participantListAudit.cardCount < participantListAudit.expectedNames.length ||
       participantListAudit.visibleCardCount !== participantListAudit.cardCount ||
       participantListAudit.visibleNames.length !== participantListAudit.expectedNames.length ||
-      participantListAudit.hasShowAllControl
+      participantListAudit.hasShowAllControl ||
+      !participantListAudit.hasCheckInLegend ||
+      JSON.stringify(participantListAudit.pendingNames) !==
+        JSON.stringify([seeded.privateName, seeded.thirdName])
     ) {
       throw new Error(`Participant list state ${JSON.stringify(participantListAudit)}`);
     }
@@ -944,6 +952,18 @@ async function main() {
 
     const profileAudit = await auditMobilePage(client, sessionId, "Progress");
     assertMobilePage(profileAudit);
+    const avatarControlAudit = await evaluate(
+      client,
+      `(() => ({
+        hasAddPhoto: [...document.querySelectorAll('button')].some(
+          (button) => String(button.textContent || '').trim() === 'Add photo',
+        ),
+      }))()`,
+      sessionId,
+    );
+    if (!avatarControlAudit.hasAddPhoto) {
+      throw new Error(`Participant avatar control state ${JSON.stringify(avatarControlAudit)}`);
+    }
     const overviewTab = await selectProfileTab(client, sessionId, "Overview");
     const historyTab = await selectProfileTab(client, sessionId, "History");
     const rulesTab = await selectProfileTab(client, sessionId, "Rules");
@@ -953,6 +973,7 @@ async function main() {
       participantList: participantListAudit,
       weightDialog: dialogAudit,
       profile: {
+        avatarControl: avatarControlAudit,
         layout: profileAudit,
         tabs: [overviewTab, historyTab, rulesTab],
       },

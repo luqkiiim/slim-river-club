@@ -221,6 +221,7 @@ export default async function DashboardPage() {
     <>
       <AppHeader
         currentUserId={currentUser?.id}
+        currentUserAvatarUrl={currentUser?.avatarUrl}
         currentUserName={session.user.name ?? "Member"}
         isAdmin={session.user.isAdmin}
         isParticipant={session.user.isParticipant}
@@ -250,10 +251,18 @@ export default async function DashboardPage() {
                 The club this month
               </h2>
             </div>
-            <span className="hidden items-center gap-1 text-sm font-medium text-moss sm:flex">
-              <TrendUp aria-hidden size={18} weight="bold" />
-              {groupSummary.activeLoggersThisMonth} active
-            </span>
+            <div className="flex flex-col items-end gap-1">
+              {users.some((user) => user.weeklyCheckInPending) ? (
+                <span className="flex items-center gap-1.5 text-xs font-medium text-ink/70">
+                  <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-[#D99A2B]" />
+                  Check-in due
+                </span>
+              ) : null}
+              <span className="hidden items-center gap-1 text-sm font-medium text-moss sm:flex">
+                <TrendUp aria-hidden size={18} weight="bold" />
+                {groupSummary.activeLoggersThisMonth} active
+              </span>
+            </div>
           </div>
 
           <div className="mt-3">

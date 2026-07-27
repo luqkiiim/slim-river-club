@@ -10,16 +10,18 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AppHeader, MobileBottomNav } from "@/components/app-chrome";
+import { AvatarEditor } from "@/components/avatar-editor";
 import { BmiMeter } from "@/components/bmi-meter";
 import { CompletionRing } from "@/components/completion-ring";
 import { LogWeightModal } from "@/components/log-weight-modal";
 import { ParticipantPrivacyForm } from "@/components/participant-privacy-form";
+import { ParticipantAvatar } from "@/components/participant-avatar";
 import { PrivateStartingWeightForm } from "@/components/private-starting-weight-form";
 import { ProfileTabs } from "@/components/profile-tabs";
 import { ProgressBar } from "@/components/progress-bar";
 import { WeightChart } from "@/components/weight-chart";
 import { WeightTable } from "@/components/weight-table";
-import { canParticipantLogWeight, getUserProfilePayload } from "@/lib/data";
+import { canParticipantLogWeight, getAppChromeUser, getUserProfilePayload } from "@/lib/data";
 import { requireSession } from "@/lib/session";
 import {
   formatMonthlyStatusLabel,
@@ -269,7 +271,10 @@ export default async function UserProfilePage({
 }) {
   const session = await requireSession();
   const { userId } = await params;
-  const payload = await getUserProfilePayload(userId, session.user.id);
+  const [payload, chromeUser] = await Promise.all([
+    getUserProfilePayload(userId, session.user.id),
+    getAppChromeUser(session.user.id),
+  ]);
 
   if (!payload) {
     notFound();
@@ -424,6 +429,7 @@ export default async function UserProfilePage({
     <>
       <AppHeader
         currentUserId={session.user.isParticipant ? session.user.id : undefined}
+        currentUserAvatarUrl={chromeUser?.avatarUrl}
         currentUserName={session.user.name ?? "Member"}
         isAdmin={session.user.isAdmin}
         isParticipant={session.user.isParticipant}
@@ -434,6 +440,16 @@ export default async function UserProfilePage({
           <Link aria-label="Back to dashboard" className="icon-button mt-0.5" href="/dashboard">
             <ArrowLeft aria-hidden size={21} weight="bold" />
           </Link>
+          {payload.canEditAvatar ? (
+            <AvatarEditor
+              avatarUrl={payload.user.avatarUrl}
+              compact
+              name={payload.user.name}
+              targetUserId={payload.user.id}
+            />
+          ) : (
+            <ParticipantAvatar avatarUrl={payload.user.avatarUrl} name={payload.user.name} size="lg" />
+          )}
           <div className="min-w-0 flex-1">
             <p className="eyebrow">{isOwnProfile ? "My progress" : "Participant profile"}</p>
             <div className="mt-1 flex flex-wrap items-center gap-2">

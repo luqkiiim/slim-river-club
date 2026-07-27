@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { AdminSheet } from "@/components/admin/admin-sheet";
+import { AvatarEditor } from "@/components/avatar-editor";
 import { CopyValueField } from "@/components/copy-value-field";
 import { CreateParticipantForm } from "@/components/create-participant-form";
 import { DeleteWeightEntryForm } from "@/components/delete-weight-entry-form";
@@ -882,6 +883,18 @@ function ParticipantEditor({
                 <CopyValueField buttonLabel="Copy code" value={user.claimCode} />
               </EditorSection>
             ) : null}
+
+            <EditorSection
+              description="Upload, crop, replace or remove this participant's profile photo."
+              title="Avatar"
+            >
+              <AvatarEditor
+                avatarUrl={user.avatarUrl}
+                compact
+                name={user.name}
+                targetUserId={user.id}
+              />
+            </EditorSection>
 
             <EditorSection
               description={

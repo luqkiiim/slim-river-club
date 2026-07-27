@@ -25,6 +25,7 @@ model User {
   isAdmin               Boolean           @default(false)
   isParticipant         Boolean           @default(true)
   totalRmOwed           Int               @default(0)
+  avatarUrl              String?
   createdAt             DateTime          @default(now())
   weightEntries         WeightEntry[]
   monthlyResults        MonthlyResult[]

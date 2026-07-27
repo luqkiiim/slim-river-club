@@ -2,6 +2,7 @@ import { CaretRight } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
 
 import { CompletionRing } from "@/components/completion-ring";
+import { ParticipantAvatar } from "@/components/participant-avatar";
 import { formatWeight } from "@/lib/weight-utils";
 import type { DashboardUserSummary } from "@/types/app";
 
@@ -22,12 +23,11 @@ export function UserCard({ user, currentMonthLabel }: UserCardProps) {
   return (
     <article className="border-b border-black/[0.08] last:border-b-0">
       <Link className="group flex min-h-[76px] items-center gap-3 py-3.5" href={`/users/${user.id}`}>
-        <span
-          aria-hidden
-          className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-sage text-lg font-semibold text-moss"
-        >
-          {user.name.slice(0, 1).toUpperCase()}
-        </span>
+        <ParticipantAvatar
+          avatarUrl={user.avatarUrl}
+          name={user.name}
+          pendingCheckIn={user.weeklyCheckInPending}
+        />
 
         <span className="min-w-0 flex-1">
           <span className="block truncate text-base font-semibold text-ink">{user.name}</span>

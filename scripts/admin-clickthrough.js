@@ -732,6 +732,12 @@ async function inspectParticipantEditor(client, sessionId) {
         closeName: closeButton?.getAttribute('aria-label') || null,
         tabNames: tabs.map((tab) => normalize(tab.textContent)),
         selectedTab: selected ? normalize(selected.textContent) : null,
+        hasAvatarSection: normalize(dialog?.textContent).includes('Avatar'),
+        hasAddPhoto: dialog
+          ? Array.from(dialog.querySelectorAll('button')).some(
+              (button) => normalize(button.textContent) === 'Add photo',
+            )
+          : false,
       };
     })()`,
     sessionId,
@@ -749,7 +755,9 @@ async function waitForParticipantEditor(client, sessionId) {
         state.hasDialog &&
         state.closeName === "Close participant editor" &&
         JSON.stringify(state.tabNames) === JSON.stringify(["Overview", "Targets", "History"]) &&
-        state.selectedTab === "Overview";
+        state.selectedTab === "Overview" &&
+        state.hasAvatarSection &&
+        state.hasAddPhoto;
 
       if (isExpected) return state;
       throw new Error(`Participant editor state ${JSON.stringify(state)}`);

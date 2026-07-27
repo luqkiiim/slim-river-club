@@ -17,6 +17,7 @@ export default async function AdminPage() {
     <>
       <AppHeader
         currentUserId={session.user.isParticipant ? session.user.id : undefined}
+        currentUserAvatarUrl={currentUser?.avatarUrl}
         currentUserName={session.user.name ?? "Admin"}
         isAdmin
         isParticipant={session.user.isParticipant}

@@ -29,6 +29,8 @@ export interface UserMonthPolicySummary {
 export interface DashboardUserSummary {
   id: string;
   name: string;
+  avatarUrl: string | null;
+  weeklyCheckInPending: boolean;
   email: string | null;
   isPrivate: boolean;
   displayMode: TrackingDisplayMode;
@@ -107,6 +109,7 @@ export interface ProfileMonthlyResult {
 
 export interface UserProfilePayload {
   user: DashboardUserSummary;
+  canEditAvatar: boolean;
   displayMode: TrackingDisplayMode;
   canManagePrivacy: boolean;
   canEditStartingWeight: boolean;
@@ -119,6 +122,7 @@ export interface UserProfilePayload {
 export interface AdminUserSummary {
   id: string;
   name: string;
+  avatarUrl: string | null;
   email: string | null;
   isAdmin: boolean;
   isParticipant: boolean;

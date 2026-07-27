@@ -4,7 +4,6 @@ import {
   ChartLineUp,
   GearSix,
   House,
-  UserCircle,
   X,
 } from "@phosphor-icons/react";
 import Link from "next/link";
@@ -12,6 +11,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { LogWeightModal } from "@/components/log-weight-modal";
 import { LogoutButton } from "@/components/logout-button";
+import { ParticipantAvatar } from "@/components/participant-avatar";
 
 type AppSection = "home" | "progress" | "admin";
 
@@ -19,6 +19,7 @@ interface AppChromeProps {
   active: AppSection;
   canLogWeight?: boolean;
   currentUserId?: string;
+  currentUserAvatarUrl?: string | null;
   currentUserName: string;
   isAdmin: boolean;
   isParticipant: boolean;
@@ -26,6 +27,7 @@ interface AppChromeProps {
 
 export function AppHeader({
   currentUserId,
+  currentUserAvatarUrl,
   currentUserName,
   isAdmin,
   isParticipant,
@@ -109,9 +111,7 @@ export function AppHeader({
             onClick={() => setAccountOpen(true)}
             type="button"
           >
-            <span className="grid h-10 w-10 place-items-center rounded-full border border-black/10 bg-sand text-moss">
-              <UserCircle aria-hidden size={26} weight="duotone" />
-            </span>
+            <ParticipantAvatar avatarUrl={currentUserAvatarUrl ?? null} name={currentUserName} size="sm" />
             <span className="max-w-24 truncate sm:max-w-40">{currentUserName}</span>
           </button>
 
@@ -120,9 +120,7 @@ export function AppHeader({
             className="hidden min-h-11 items-center gap-2 rounded-full px-2 py-1 text-sm font-semibold text-ink transition hover:text-moss lg:flex"
             href={accountHref}
           >
-            <span className="grid h-10 w-10 place-items-center rounded-full border border-black/10 bg-sand text-moss">
-              <UserCircle aria-hidden size={26} weight="duotone" />
-            </span>
+            <ParticipantAvatar avatarUrl={currentUserAvatarUrl ?? null} name={currentUserName} size="sm" />
             <span className="max-w-40 truncate">{currentUserName}</span>
           </Link>
 
@@ -173,7 +171,7 @@ export function AppHeader({
                   href={`/users/${currentUserId}`}
                   onClick={() => setAccountOpen(false)}
                 >
-                  <UserCircle aria-hidden size={21} weight="bold" />
+                  <ParticipantAvatar avatarUrl={currentUserAvatarUrl ?? null} name={currentUserName} size="sm" />
                   My profile
                 </Link>
               ) : null}
