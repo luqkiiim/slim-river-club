@@ -254,7 +254,7 @@ export default async function DashboardPage() {
             <div className="flex flex-col items-end gap-1">
               {users.some((user) => user.weeklyCheckInPending) ? (
                 <span className="flex items-center gap-1.5 text-xs font-medium text-ink/70">
-                  <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-[#D99A2B]" />
+                  <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-[#C94735]" />
                   Check-in due
                 </span>
               ) : null}

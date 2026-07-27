@@ -40,7 +40,7 @@ export function ParticipantAvatar({
         <>
           <span
             aria-hidden
-            className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-cream bg-[#D99A2B] shadow-sm"
+            className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-cream bg-[#C94735] shadow-sm"
           />
           <span className="sr-only">Weekly check-in pending</span>
         </>
