@@ -1,9 +1,10 @@
 "use client";
 
 import { upload } from "@vercel/blob/client";
-import { Camera, Trash, X } from "@phosphor-icons/react";
-import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { Camera, Eye, Trash, X } from "@phosphor-icons/react";
+import Image from "next/image";
+import { usePathname, useRouter } from "next/navigation";
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import Cropper, { type Area } from "react-easy-crop";
 
 import { ParticipantAvatar } from "@/components/participant-avatar";
@@ -36,7 +37,7 @@ async function decodeOriginal(file: File) {
 }
 
 async function loadImage(src: string) {
-  const image = new Image();
+  const image = new window.Image();
   image.src = src;
   await image.decode();
   return image;
@@ -83,6 +84,8 @@ interface AvatarEditorProps {
   name: string;
   targetUserId: string;
   compact?: boolean;
+  canEdit?: boolean;
+  presentation?: "inline" | "profile";
 }
 
 export function AvatarEditor({
@@ -90,21 +93,112 @@ export function AvatarEditor({
   name,
   targetUserId,
   compact = false,
+  canEdit = true,
+  presentation = "inline",
 }: AvatarEditorProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const avatarButtonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const viewerRef = useRef<HTMLElement>(null);
+  const viewerCloseRef = useRef<HTMLButtonElement>(null);
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedArea, setCroppedArea] = useState<Area | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
 
   useEffect(() => {
     return () => {
       if (sourceUrl) URL.revokeObjectURL(sourceUrl);
     };
   }, [sourceUrl]);
+
+  useEffect(() => {
+    setMenuOpen(false);
+    setViewerOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+
+      if (
+        target instanceof Node &&
+        !menuRef.current?.contains(target) &&
+        !avatarButtonRef.current?.contains(target)
+      ) {
+        setMenuOpen(false);
+        avatarButtonRef.current?.focus();
+      }
+    };
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMenuOpen(false);
+        avatarButtonRef.current?.focus();
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    window.requestAnimationFrame(() => {
+      menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
+    });
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [menuOpen]);
+
+  useEffect(() => {
+    if (!viewerOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    viewerCloseRef.current?.focus();
+
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setViewerOpen(false);
+        avatarButtonRef.current?.focus();
+        return;
+      }
+
+      if (event.key !== "Tab" || !viewerRef.current) return;
+
+      const focusable = Array.from(
+        viewerRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled])',
+        ),
+      );
+      const first = focusable[0];
+      const last = focusable.at(-1);
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [viewerOpen]);
 
   function closeEditor() {
     if (busy) return;
@@ -181,34 +275,78 @@ export function AvatarEditor({
     router.refresh();
   }
 
-  return (
-    <div className={compact ? "flex items-center gap-3" : "space-y-3"}>
-      <ParticipantAvatar avatarUrl={avatarUrl} name={name} size={compact ? "lg" : "md"} />
-      <div className="flex flex-wrap gap-2">
-        <input
-          ref={fileInputRef}
-          accept=".jpg,.jpeg,.png,.webp,.heic,.heif,image/jpeg,image/png,image/webp,image/heic,image/heif"
-          hidden
-          onChange={(event) => void selectFile(event.target.files?.[0])}
-          type="file"
-        />
-        <button
-          className="secondary-button min-h-11"
-          disabled={busy}
-          onClick={() => fileInputRef.current?.click()}
-          type="button"
-        >
-          <Camera aria-hidden size={19} weight="bold" />
-          {avatarUrl ? "Change photo" : "Add photo"}
-        </button>
-        {avatarUrl ? (
-          <button className="secondary-button min-h-11" disabled={busy} onClick={() => void removePhoto()} type="button">
-            <Trash aria-hidden size={19} weight="bold" />
-            Remove
-          </button>
-        ) : null}
-      </div>
-      {error && !sourceUrl ? <p className="text-sm font-medium text-[#9B3F2D]" role="alert">{error}</p> : null}
+  function openFilePicker() {
+    setMenuOpen(false);
+    fileInputRef.current?.click();
+  }
+
+  function openViewer() {
+    setMenuOpen(false);
+    setViewerOpen(true);
+  }
+
+  function closeViewer() {
+    setViewerOpen(false);
+    avatarButtonRef.current?.focus();
+  }
+
+  function handleMenuKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    const items = Array.from(
+      event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'),
+    );
+    const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
+    let nextIndex: number | null = null;
+
+    if (event.key === "ArrowDown") nextIndex = (currentIndex + 1) % items.length;
+    if (event.key === "ArrowUp") nextIndex = (currentIndex - 1 + items.length) % items.length;
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = items.length - 1;
+
+    if (nextIndex !== null) {
+      event.preventDefault();
+      items[nextIndex]?.focus();
+    } else if (event.key === "Tab") {
+      setMenuOpen(false);
+    }
+  }
+
+  const photoDialogs = (
+    <>
+      {viewerOpen && avatarUrl ? (
+        <div className="fixed inset-0 z-[75] grid place-items-center bg-ink/90 p-4">
+          <button
+            aria-label="Close enlarged profile photo"
+            className="absolute inset-0 cursor-default"
+            onClick={closeViewer}
+            type="button"
+          />
+          <section
+            ref={viewerRef}
+            aria-label={`${name}'s profile photo`}
+            aria-modal="true"
+            className="relative z-10 flex w-full max-w-xl flex-col items-end"
+            role="dialog"
+          >
+            <button
+              ref={viewerCloseRef}
+              aria-label="Close enlarged profile photo"
+              className="icon-button mb-3 border-white/20 bg-white/10 text-white hover:bg-white/20"
+              onClick={closeViewer}
+              type="button"
+            >
+              <X aria-hidden size={22} weight="bold" />
+            </button>
+            <Image
+              alt={`${name}'s enlarged profile photo`}
+              className="aspect-square h-auto max-h-[78svh] w-full rounded-[28px] object-cover shadow-2xl"
+              height={512}
+              priority
+              src={avatarUrl}
+              width={512}
+            />
+          </section>
+        </div>
+      ) : null}
 
       {sourceUrl ? (
         <div className="fixed inset-0 z-[70] grid place-items-center bg-ink/55 p-3">
@@ -269,6 +407,99 @@ export function AvatarEditor({
           <span className="sr-only" role="status">Processing profile photo</span>
         </div>
       ) : null}
+    </>
+  );
+
+  if (presentation === "profile") {
+    const interactive = canEdit || Boolean(avatarUrl);
+
+    return (
+      <div className="relative shrink-0">
+        <input
+          ref={fileInputRef}
+          accept=".jpg,.jpeg,.png,.webp,.heic,.heif,image/jpeg,image/png,image/webp,image/heic,image/heif"
+          hidden
+          onChange={(event) => void selectFile(event.target.files?.[0])}
+          type="file"
+        />
+        {interactive ? (
+          <button
+            ref={avatarButtonRef}
+            aria-controls="profile-avatar-menu"
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
+            aria-label={`Open ${name}'s profile photo actions`}
+            className="block min-h-20 min-w-20 rounded-full outline-none transition hover:brightness-95 focus-visible:ring-2 focus-visible:ring-leaf focus-visible:ring-offset-4 focus-visible:ring-offset-cream"
+            disabled={busy}
+            onClick={() => setMenuOpen((open) => !open)}
+            type="button"
+          >
+            <ParticipantAvatar avatarUrl={avatarUrl} name={name} size="lg" />
+          </button>
+        ) : (
+          <ParticipantAvatar avatarUrl={null} name={name} size="lg" />
+        )}
+        {menuOpen ? (
+          <div
+            ref={menuRef}
+            aria-label="Profile photo actions"
+            className="absolute left-0 top-full z-30 mt-2 w-44 overflow-hidden rounded-2xl border border-black/10 bg-cream p-1.5 shadow-[0_16px_40px_rgba(32,51,38,0.18)]"
+            id="profile-avatar-menu"
+            onKeyDown={handleMenuKeyDown}
+            role="menu"
+          >
+            {avatarUrl ? (
+              <button className="flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-left text-sm font-semibold text-ink hover:bg-sand" onClick={openViewer} role="menuitem" type="button">
+                <Eye aria-hidden size={18} weight="bold" />
+                View photo
+              </button>
+            ) : null}
+            {canEdit ? (
+              <button className="flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-left text-sm font-semibold text-ink hover:bg-sand" onClick={openFilePicker} role="menuitem" type="button">
+                <Camera aria-hidden size={18} weight="bold" />
+                {avatarUrl ? "Change photo" : "Add photo"}
+              </button>
+            ) : null}
+            {canEdit && avatarUrl ? (
+              <button className="flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-left text-sm font-semibold text-[#9B3F2D] hover:bg-[#F8E6E1]" onClick={() => { setMenuOpen(false); void removePhoto(); }} role="menuitem" type="button">
+                <Trash aria-hidden size={18} weight="bold" />
+                Remove photo
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+        {error && !sourceUrl ? (
+          <p className="absolute left-0 top-full z-20 mt-2 w-56 rounded-xl bg-cream p-2 text-sm font-medium text-[#9B3F2D] shadow-md" role="alert">{error}</p>
+        ) : null}
+        {photoDialogs}
+      </div>
+    );
+  }
+
+  return (
+    <div className={compact ? "flex items-center gap-3" : "space-y-3"}>
+      <ParticipantAvatar avatarUrl={avatarUrl} name={name} size={compact ? "lg" : "md"} />
+      <div className="flex flex-wrap gap-2">
+        <input
+          ref={fileInputRef}
+          accept=".jpg,.jpeg,.png,.webp,.heic,.heif,image/jpeg,image/png,image/webp,image/heic,image/heif"
+          hidden
+          onChange={(event) => void selectFile(event.target.files?.[0])}
+          type="file"
+        />
+        <button className="secondary-button min-h-11" disabled={busy} onClick={openFilePicker} type="button">
+          <Camera aria-hidden size={19} weight="bold" />
+          {avatarUrl ? "Change photo" : "Add photo"}
+        </button>
+        {avatarUrl ? (
+          <button className="secondary-button min-h-11" disabled={busy} onClick={() => void removePhoto()} type="button">
+            <Trash aria-hidden size={19} weight="bold" />
+            Remove
+          </button>
+        ) : null}
+      </div>
+      {error && !sourceUrl ? <p className="text-sm font-medium text-[#9B3F2D]" role="alert">{error}</p> : null}
+      {photoDialogs}
     </div>
   );
 }

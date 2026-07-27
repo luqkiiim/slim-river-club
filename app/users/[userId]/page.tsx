@@ -10,12 +10,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AppHeader, MobileBottomNav } from "@/components/app-chrome";
-import { AvatarEditor } from "@/components/avatar-editor";
 import { BmiMeter } from "@/components/bmi-meter";
 import { CompletionRing } from "@/components/completion-ring";
 import { LogWeightModal } from "@/components/log-weight-modal";
 import { ParticipantPrivacyForm } from "@/components/participant-privacy-form";
-import { ParticipantAvatar } from "@/components/participant-avatar";
+import { ProfileAvatarControl } from "@/components/profile-avatar-control";
 import { PrivateStartingWeightForm } from "@/components/private-starting-weight-form";
 import { ProfileTabs } from "@/components/profile-tabs";
 import { ProgressBar } from "@/components/progress-bar";
@@ -440,16 +439,12 @@ export default async function UserProfilePage({
           <Link aria-label="Back to dashboard" className="icon-button mt-0.5" href="/dashboard">
             <ArrowLeft aria-hidden size={21} weight="bold" />
           </Link>
-          {payload.canEditAvatar ? (
-            <AvatarEditor
-              avatarUrl={payload.user.avatarUrl}
-              compact
-              name={payload.user.name}
-              targetUserId={payload.user.id}
-            />
-          ) : (
-            <ParticipantAvatar avatarUrl={payload.user.avatarUrl} name={payload.user.name} size="lg" />
-          )}
+          <ProfileAvatarControl
+            avatarUrl={payload.user.avatarUrl}
+            canEdit={payload.canEditAvatar}
+            name={payload.user.name}
+            targetUserId={payload.user.id}
+          />
           <div className="min-w-0 flex-1">
             <p className="eyebrow">{isOwnProfile ? "My progress" : "Participant profile"}</p>
             <div className="mt-1 flex flex-wrap items-center gap-2">

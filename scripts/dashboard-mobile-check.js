@@ -33,7 +33,9 @@ const seeded = {
   publicPassword: "SomePass123!",
   publicName: `Mobile QA Public ${timestamp}`,
   privateName: `Mobile QA Private ${timestamp}`,
+  privateEmail: `mobile-dashboard-private-${timestamp}@example.com`,
   thirdName: `Mobile QA Third ${timestamp}`,
+  thirdEmail: `mobile-dashboard-third-${timestamp}@example.com`,
 };
 
 function delay(ms) {
@@ -735,6 +737,7 @@ async function seedDatabase() {
       monthlyLossTargetKg: 2,
       monthlyPenaltyRm: 30,
       heightCm: 168,
+      avatarUrl: "/apple-icon.png",
       challengeStartDate: createUtcDateDaysAgo(60),
       weightEntries: {
         create: [
@@ -753,10 +756,10 @@ async function seedDatabase() {
     },
   });
 
-  await prisma.user.create({
+  const privateUser = await prisma.user.create({
     data: {
       name: seeded.privateName,
-      email: `mobile-dashboard-private-${timestamp}@example.com`,
+      email: seeded.privateEmail,
       passwordHash: hashSync("SomePass123!", 10),
       isParticipant: true,
       isPrivate: true,
@@ -765,6 +768,7 @@ async function seedDatabase() {
       targetLossKg: 6,
       monthlyLossTargetKg: 1,
       monthlyPenaltyRm: 30,
+      avatarUrl: "/apple-icon.png",
       challengeStartDate: createUtcDateDaysAgo(60),
       weightEntries: {
         create: [
@@ -783,10 +787,10 @@ async function seedDatabase() {
     },
   });
 
-  await prisma.user.create({
+  const thirdUser = await prisma.user.create({
     data: {
       name: seeded.thirdName,
-      email: `mobile-dashboard-third-${timestamp}@example.com`,
+      email: seeded.thirdEmail,
       passwordHash: hashSync("SomePass123!", 10),
       isParticipant: true,
       isPrivate: false,
@@ -802,6 +806,8 @@ async function seedDatabase() {
   return {
     adminId: admin.id,
     publicUserId: publicUser.id,
+    privateUserId: privateUser.id,
+    thirdUserId: thirdUser.id,
   };
 }
 
@@ -828,7 +834,7 @@ async function main() {
 
   try {
     await cleanupDatabase();
-    const { publicUserId } = await seedDatabase();
+    const { publicUserId, privateUserId, thirdUserId } = await seedDatabase();
     server = await ensureServerReady();
 
     browser = spawn(
@@ -952,28 +958,209 @@ async function main() {
 
     const profileAudit = await auditMobilePage(client, sessionId, "Progress");
     assertMobilePage(profileAudit);
-    const avatarControlAudit = await evaluate(
+    const ownAvatarButtonName = `Open ${seeded.publicName}'s profile photo actions`;
+    await clickByRoleAndName(client, sessionId, "button", ownAvatarButtonName);
+    const ownAvatarMenuAudit = await evaluate(
+      client,
+      `(() => {
+        const normalize = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+        const trigger = [...document.querySelectorAll('button')].find(
+          (button) => button.getAttribute('aria-label') === ${JSON.stringify(ownAvatarButtonName)},
+        );
+        const menu = document.querySelector('[role="menu"][aria-label="Profile photo actions"]');
+        const triggerRect = trigger?.getBoundingClientRect();
+        const menuRect = menu?.getBoundingClientRect();
+        return {
+          triggerExpanded: trigger?.getAttribute('aria-expanded'),
+          items: menu ? [...menu.querySelectorAll('[role="menuitem"]')].map((item) => normalize(item.textContent)) : [],
+          belowAvatar: Boolean(triggerRect && menuRect && menuRect.top >= triggerRect.bottom),
+          withinViewport: Boolean(menuRect && menuRect.left >= 0 && menuRect.right <= window.innerWidth),
+          hasInlinePhotoButton: [...document.querySelectorAll('button')].some(
+            (button) =>
+              !button.closest('[role="menu"]') &&
+              ['Change photo', 'Remove'].includes(normalize(button.textContent)),
+          ),
+        };
+      })()`,
+      sessionId,
+    );
+    if (
+      ownAvatarMenuAudit.triggerExpanded !== "true" ||
+      JSON.stringify(ownAvatarMenuAudit.items) !==
+        JSON.stringify(["View photo", "Change photo", "Remove photo"]) ||
+      !ownAvatarMenuAudit.belowAvatar ||
+      !ownAvatarMenuAudit.withinViewport ||
+      ownAvatarMenuAudit.hasInlinePhotoButton
+    ) {
+      throw new Error(`Own avatar menu state ${JSON.stringify(ownAvatarMenuAudit)}`);
+    }
+
+    await clickByRoleAndName(client, sessionId, "menuitem", "View photo");
+    const photoViewerAudit = await waitFor(
+      async () => {
+        const audit = await evaluate(
+          client,
+          `(() => {
+            const dialog = document.querySelector('[role="dialog"][aria-modal="true"]');
+            const image = dialog?.querySelector('img');
+            return {
+              hasDialog: Boolean(dialog),
+              dialogLabel: dialog?.getAttribute('aria-label') || null,
+              imageAlt: image?.getAttribute('alt') || null,
+              focusInside: Boolean(dialog?.contains(document.activeElement)),
+              bodyLocked: document.body.style.overflow === 'hidden',
+            };
+          })()`,
+          sessionId,
+        );
+        if (audit.hasDialog && audit.focusInside) return audit;
+        throw new Error(`Photo viewer state ${JSON.stringify(audit)}`);
+      },
+      10000,
+      "enlarged profile photo viewer",
+    );
+    if (
+      photoViewerAudit.dialogLabel !== `${seeded.publicName}'s profile photo` ||
+      photoViewerAudit.imageAlt !== `${seeded.publicName}'s enlarged profile photo` ||
+      !photoViewerAudit.bodyLocked
+    ) {
+      throw new Error(`Photo viewer accessibility ${JSON.stringify(photoViewerAudit)}`);
+    }
+    await clickByRoleAndName(client, sessionId, "button", "Close enlarged profile photo");
+    await waitFor(
+      async () => {
+        const state = await evaluate(
+          client,
+          `(() => ({
+            hasDialog: Boolean(document.querySelector('[role="dialog"][aria-modal="true"]')),
+            focusedName: document.activeElement?.getAttribute?.('aria-label') || null,
+          }))()`,
+          sessionId,
+        );
+        if (!state.hasDialog && state.focusedName === ownAvatarButtonName) return state;
+        throw new Error(`Photo viewer close state ${JSON.stringify(state)}`);
+      },
+      10000,
+      "photo viewer close and focus restore",
+    );
+
+    await clickByRoleAndName(client, sessionId, "button", ownAvatarButtonName);
+    await pressEscape(client, sessionId);
+    const escapeAudit = await waitFor(
+      async () => {
+        const state = await evaluate(
+          client,
+          `(() => ({
+            hasMenu: Boolean(document.querySelector('[role="menu"][aria-label="Profile photo actions"]')),
+            focusedName: document.activeElement?.getAttribute?.('aria-label') || null,
+          }))()`,
+          sessionId,
+        );
+        if (!state.hasMenu && state.focusedName === ownAvatarButtonName) return state;
+        throw new Error(`Avatar menu Escape state ${JSON.stringify(state)}`);
+      },
+      10000,
+      "avatar menu Escape and focus restore",
+    );
+
+    await clickByRoleAndName(client, sessionId, "button", ownAvatarButtonName);
+    await evaluate(
+      client,
+      "document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))",
+      sessionId,
+    );
+    const outsideTapAudit = await waitFor(
+      async () => {
+        const state = await evaluate(
+          client,
+          `(() => ({
+            hasMenu: Boolean(document.querySelector('[role="menu"][aria-label="Profile photo actions"]')),
+            focusedName: document.activeElement?.getAttribute?.('aria-label') || null,
+          }))()`,
+          sessionId,
+        );
+        if (!state.hasMenu && state.focusedName === ownAvatarButtonName) return state;
+        throw new Error(`Avatar menu outside-tap state ${JSON.stringify(state)}`);
+      },
+      10000,
+      "avatar menu outside tap and focus restore",
+    );
+    const overviewTab = await selectProfileTab(client, sessionId, "Overview");
+    const historyTab = await selectProfileTab(client, sessionId, "History");
+    const rulesTab = await selectProfileTab(client, sessionId, "Rules");
+
+    await client.send("Page.navigate", { url: `${baseUrl}/users/${privateUserId}` }, sessionId);
+    await waitForPath(client, sessionId, `/users/${privateUserId}`);
+    await delay(500);
+    const otherPhotoButtonName = `Open ${seeded.privateName}'s profile photo actions`;
+    await clickByRoleAndName(client, sessionId, "button", otherPhotoButtonName);
+    const otherPhotoMenu = await evaluate(
+      client,
+      `(() => {
+        const menu = document.querySelector('[role="menu"][aria-label="Profile photo actions"]');
+        return menu ? [...menu.querySelectorAll('[role="menuitem"]')].map(
+          (item) => String(item.textContent || '').replace(/\\s+/g, ' ').trim(),
+        ) : [];
+      })()`,
+      sessionId,
+    );
+    if (JSON.stringify(otherPhotoMenu) !== JSON.stringify(["View photo"])) {
+      throw new Error(`Other participant photo menu ${JSON.stringify(otherPhotoMenu)}`);
+    }
+
+    await client.send("Page.navigate", { url: `${baseUrl}/users/${thirdUserId}` }, sessionId);
+    await waitForPath(client, sessionId, `/users/${thirdUserId}`);
+    await delay(500);
+    const otherNoPhotoAudit = await evaluate(
       client,
       `(() => ({
-        hasAddPhoto: [...document.querySelectorAll('button')].some(
-          (button) => String(button.textContent || '').trim() === 'Add photo',
+        hasAvatarButton: [...document.querySelectorAll('button')].some(
+          (button) => String(button.getAttribute('aria-label') || '').startsWith('Open ') &&
+            String(button.getAttribute('aria-label') || '').endsWith('profile photo actions'),
         ),
       }))()`,
       sessionId,
     );
-    if (!avatarControlAudit.hasAddPhoto) {
-      throw new Error(`Participant avatar control state ${JSON.stringify(avatarControlAudit)}`);
+    if (otherNoPhotoAudit.hasAvatarButton) {
+      throw new Error(`Other no-photo avatar state ${JSON.stringify(otherNoPhotoAudit)}`);
     }
-    const overviewTab = await selectProfileTab(client, sessionId, "Overview");
-    const historyTab = await selectProfileTab(client, sessionId, "History");
-    const rulesTab = await selectProfileTab(client, sessionId, "Rules");
+
+    const thirdCookies = await createSessionCookies(seeded.thirdEmail, "SomePass123!");
+    await applySessionCookies(client, thirdCookies);
+    await client.send("Page.navigate", { url: `${baseUrl}/users/${thirdUserId}` }, sessionId);
+    await waitForPath(client, sessionId, `/users/${thirdUserId}`);
+    await delay(500);
+    const ownNoPhotoButtonName = `Open ${seeded.thirdName}'s profile photo actions`;
+    await clickByRoleAndName(client, sessionId, "button", ownNoPhotoButtonName);
+    const ownNoPhotoMenu = await evaluate(
+      client,
+      `(() => {
+        const menu = document.querySelector('[role="menu"][aria-label="Profile photo actions"]');
+        return menu ? [...menu.querySelectorAll('[role="menuitem"]')].map(
+          (item) => String(item.textContent || '').replace(/\\s+/g, ' ').trim(),
+        ) : [];
+      })()`,
+      sessionId,
+    );
+    if (JSON.stringify(ownNoPhotoMenu) !== JSON.stringify(["Add photo"])) {
+      throw new Error(`Own no-photo avatar menu ${JSON.stringify(ownNoPhotoMenu)}`);
+    }
+
     const result = {
       status: "passed",
       dashboard: dashboardAudit,
       participantList: participantListAudit,
       weightDialog: dialogAudit,
       profile: {
-        avatarControl: avatarControlAudit,
+        avatarControl: {
+          ownWithPhoto: ownAvatarMenuAudit,
+          viewer: photoViewerAudit,
+          escape: escapeAudit,
+          outsideTap: outsideTapAudit,
+          otherWithPhoto: otherPhotoMenu,
+          otherWithoutPhoto: otherNoPhotoAudit,
+          ownWithoutPhoto: ownNoPhotoMenu,
+        },
         layout: profileAudit,
         tabs: [overviewTab, historyTab, rulesTab],
       },
