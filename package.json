@@ -12,6 +12,7 @@
     "db:migrations:seal": "node scripts/turso-migrations.js --seal",
     "test:migrations": "node --test scripts/turso-migrations.test.js",
     "test:weekly-check-in": "tsx --test scripts/weekly-check-in.test.ts",
+    "test:monthly-target-history": "tsx --test scripts/monthly-target-history.test.ts",
     "test:ui:mobile": "node scripts/dashboard-mobile-check.js",
     "test:ui:admin": "node scripts/admin-clickthrough.js"
   },

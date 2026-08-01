@@ -2,6 +2,11 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import {
+  buildUserMonthlyTargetMap,
+  getMonthlyLossTargetKgForPeriod,
+  type UserMonthlyTargetMap,
+} from "@/lib/monthly-targets";
+import {
   MONTHLY_LOSS_TARGET_KG,
   RM_PENALTY,
   buildResolvedWeightTimeline,
@@ -42,6 +47,7 @@ import type {
   ProfileMonthlyResult,
   TrackingDisplayMode,
   UserMonthPolicySummary,
+  UserMonthlyTargetSummary,
   UserProfilePayload,
 } from "@/types/app";
 
@@ -383,6 +389,7 @@ function buildDashboardUser(
   user: ParticipantUserWithRelations,
   monthPolicies: MonthPolicyMap,
   userMonthPolicies: UserMonthPolicyMap,
+  userMonthlyTargets: UserMonthlyTargetMap,
   viewerUserId?: string,
 ): DashboardUserSummary {
   const tracking = buildTrackingState(user, viewerUserId);
@@ -393,7 +400,13 @@ function buildDashboardUser(
     userMonthPolicies,
     currentMonth,
   );
-  const currentMonthRequiredLossKg = getRequiredLossKg(tracking.monthlyLossTargetKg, currentMonthTargetPct);
+  const currentMonthBaseTargetKg = getMonthlyLossTargetKgForPeriod(
+    user.id,
+    tracking.monthlyLossTargetKg,
+    userMonthlyTargets,
+    currentMonth,
+  );
+  const currentMonthRequiredLossKg = getRequiredLossKg(currentMonthBaseTargetKg, currentMonthTargetPct);
   const currentMonthStartWeight =
     tracking.displayMode === "weight"
       ? getLatestResolvedWeightBefore(tracking.timeline, currentMonth.start) ?? user.startWeight
@@ -431,7 +444,7 @@ function buildDashboardUser(
     currentWeight: tracking.displayMode === "weight" ? tracking.currentWeight : null,
     targetWeight: tracking.displayMode === "weight" ? tracking.targetWeight : null,
     targetLossKg: tracking.targetLossKg,
-    monthlyLossTargetKg: tracking.monthlyLossTargetKg,
+    monthlyLossTargetKg: currentMonthBaseTargetKg,
     currentMonthRequiredLossKg,
     currentMonthTargetWeight,
     currentMonthTargetPct,
@@ -483,6 +496,7 @@ async function upsertMonthlyResultsForUser(
   user: ParticipantUserWithRelations,
   monthPolicies: MonthPolicyMap,
   userMonthPolicies: UserMonthPolicyMap,
+  userMonthlyTargets: UserMonthlyTargetMap,
   db: DbClient,
 ) {
   const challengeStartDate = getEffectiveChallengeStartDate(user);
@@ -502,7 +516,13 @@ async function upsertMonthlyResultsForUser(
       userMonthPolicies,
       period,
     );
-    const requiredLossKg = getRequiredLossKg(tracking.monthlyLossTargetKg, targetRatioPct);
+    const monthlyLossTargetKg = getMonthlyLossTargetKgForPeriod(
+      user.id,
+      tracking.monthlyLossTargetKg,
+      userMonthlyTargets,
+      period,
+    );
+    const requiredLossKg = getRequiredLossKg(monthlyLossTargetKg, targetRatioPct);
     const measurementStart = penaltyExempt ? challengeStartDate : period.start;
     const totalLostBeforeMonth = getTotalKgLostBefore(tracking.timeline, measurementStart);
     const totalLostAtMonthEnd = getTotalKgLostOnOrBefore(tracking.timeline, period.end);
@@ -606,8 +626,18 @@ export async function syncUserMonthlyResults(userId: string, db: DbClient = pris
       requiredTargetPct: true,
     },
   });
+  const userMonthlyTargetRecords = await db.userMonthlyTarget.findMany({
+    where: { userId },
+    select: {
+      userId: true,
+      month: true,
+      year: true,
+      monthlyLossTargetKg: true,
+    },
+  });
   const monthPolicies = buildMonthPolicyMap(monthPolicyRecords);
   const userMonthPolicies = buildUserMonthPolicyMap(userMonthPolicyRecords);
+  const userMonthlyTargets = buildUserMonthlyTargetMap(userMonthlyTargetRecords);
   const user = await db.user.findUnique({
     where: { id: userId },
     include: {
@@ -642,13 +672,13 @@ export async function syncUserMonthlyResults(userId: string, db: DbClient = pris
     return user.id;
   }
 
-  await upsertMonthlyResultsForUser(user, monthPolicies, userMonthPolicies, db);
+  await upsertMonthlyResultsForUser(user, monthPolicies, userMonthPolicies, userMonthlyTargets, db);
 
   return user.id;
 }
 
 export async function syncAllMonthlyResults() {
-  const [monthPolicyRecords, userMonthPolicyRecords, users] = await Promise.all([
+  const [monthPolicyRecords, userMonthPolicyRecords, userMonthlyTargetRecords, users] = await Promise.all([
     prisma.monthPolicy.findMany({
       select: {
         month: true,
@@ -662,6 +692,14 @@ export async function syncAllMonthlyResults() {
         month: true,
         year: true,
         requiredTargetPct: true,
+      },
+    }),
+    prisma.userMonthlyTarget.findMany({
+      select: {
+        userId: true,
+        month: true,
+        year: true,
+        monthlyLossTargetKg: true,
       },
     }),
     prisma.user.findMany({
@@ -680,15 +718,16 @@ export async function syncAllMonthlyResults() {
   ]);
   const monthPolicies = buildMonthPolicyMap(monthPolicyRecords);
   const userMonthPolicies = buildUserMonthPolicyMap(userMonthPolicyRecords);
+  const userMonthlyTargets = buildUserMonthlyTargetMap(userMonthlyTargetRecords);
 
   for (const user of users) {
-    await upsertMonthlyResultsForUser(user, monthPolicies, userMonthPolicies, prisma);
+    await upsertMonthlyResultsForUser(user, monthPolicies, userMonthPolicies, userMonthlyTargets, prisma);
   }
 }
 
 export async function getDashboardPayload(viewerUserId?: string) {
   await syncAllMonthlyResults();
-  const [monthPolicyRecords, userMonthPolicyRecords, users] = await Promise.all([
+  const [monthPolicyRecords, userMonthPolicyRecords, userMonthlyTargetRecords, users] = await Promise.all([
     prisma.monthPolicy.findMany({
       select: {
         month: true,
@@ -702,6 +741,14 @@ export async function getDashboardPayload(viewerUserId?: string) {
         month: true,
         year: true,
         requiredTargetPct: true,
+      },
+    }),
+    prisma.userMonthlyTarget.findMany({
+      select: {
+        userId: true,
+        month: true,
+        year: true,
+        monthlyLossTargetKg: true,
       },
     }),
     prisma.user.findMany({
@@ -723,9 +770,10 @@ export async function getDashboardPayload(viewerUserId?: string) {
   ]);
   const monthPolicies = buildMonthPolicyMap(monthPolicyRecords);
   const userMonthPolicies = buildUserMonthPolicyMap(userMonthPolicyRecords);
+  const userMonthlyTargets = buildUserMonthlyTargetMap(userMonthlyTargetRecords);
 
   const summaries = users.map((user) =>
-    buildDashboardUser(user, monthPolicies, userMonthPolicies, viewerUserId),
+    buildDashboardUser(user, monthPolicies, userMonthPolicies, userMonthlyTargets, viewerUserId),
   );
   const currentMonth = getCurrentMonthPeriod();
 
@@ -790,7 +838,7 @@ export async function getAppChromeUser(userId: string) {
 
 export async function getUserProfilePayload(userId: string, viewerUserId: string): Promise<UserProfilePayload | null> {
   await syncUserMonthlyResults(userId);
-  const [monthPolicyRecords, userMonthPolicyRecords] = await Promise.all([
+  const [monthPolicyRecords, userMonthPolicyRecords, userMonthlyTargetRecords] = await Promise.all([
     prisma.monthPolicy.findMany({
       select: {
         month: true,
@@ -807,9 +855,19 @@ export async function getUserProfilePayload(userId: string, viewerUserId: string
         requiredTargetPct: true,
       },
     }),
+    prisma.userMonthlyTarget.findMany({
+      where: { userId },
+      select: {
+        userId: true,
+        month: true,
+        year: true,
+        monthlyLossTargetKg: true,
+      },
+    }),
   ]);
   const monthPolicies = buildMonthPolicyMap(monthPolicyRecords);
   const userMonthPolicies = buildUserMonthPolicyMap(userMonthPolicyRecords);
+  const userMonthlyTargets = buildUserMonthlyTargetMap(userMonthlyTargetRecords);
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -828,7 +886,7 @@ export async function getUserProfilePayload(userId: string, viewerUserId: string
   }
 
   const tracking = buildTrackingState(user, viewerUserId);
-  const summary = buildDashboardUser(user, monthPolicies, userMonthPolicies, viewerUserId);
+  const summary = buildDashboardUser(user, monthPolicies, userMonthPolicies, userMonthlyTargets, viewerUserId);
   const bmi = buildBmiSummary(user, tracking);
 
   const monthlyResults: ProfileMonthlyResult[] = user.monthlyResults.map((result) => {
@@ -883,7 +941,7 @@ export async function getUserProfilePayload(userId: string, viewerUserId: string
 
 export async function getAdminPayload() {
   await syncAllMonthlyResults();
-  const [monthPolicies, userMonthPolicies, users] = await Promise.all([
+  const [monthPolicies, userMonthPolicies, userMonthlyTargets, users] = await Promise.all([
     prisma.monthPolicy.findMany({
       orderBy: [{ year: "asc" }, { month: "asc" }],
     }),
@@ -895,6 +953,16 @@ export async function getAdminPayload() {
         month: true,
         year: true,
         requiredTargetPct: true,
+      },
+    }),
+    prisma.userMonthlyTarget.findMany({
+      orderBy: [{ year: "desc" }, { month: "desc" }],
+      select: {
+        id: true,
+        userId: true,
+        month: true,
+        year: true,
+        monthlyLossTargetKg: true,
       },
     }),
     prisma.user.findMany({
@@ -912,12 +980,22 @@ export async function getAdminPayload() {
     }),
   ]);
   const userMonthPoliciesByUser = new Map<string, UserMonthPolicySummary[]>();
+  const userMonthlyTargetsByUser = new Map<string, UserMonthlyTargetSummary[]>();
 
   for (const policy of userMonthPolicies) {
     const policies = userMonthPoliciesByUser.get(policy.userId) ?? [];
     policies.push(policy);
     userMonthPoliciesByUser.set(policy.userId, policies);
   }
+
+  for (const target of userMonthlyTargets) {
+    const targets = userMonthlyTargetsByUser.get(target.userId) ?? [];
+    targets.push(target);
+    userMonthlyTargetsByUser.set(target.userId, targets);
+  }
+
+  const userMonthlyTargetMap = buildUserMonthlyTargetMap(userMonthlyTargets);
+  const currentMonth = getCurrentMonthPeriod();
 
   const adminUsers: AdminUserSummary[] = users.map((user) => {
     if (!isParticipantUser(user)) {
@@ -936,6 +1014,8 @@ export async function getAdminPayload() {
         targetWeight: null,
         targetLossKg: null,
         monthlyLossTargetKg: MONTHLY_LOSS_TARGET_KG,
+        baseMonthlyLossTargetKg: MONTHLY_LOSS_TARGET_KG,
+        monthlyTargetChanges: [],
         monthlyPenaltyRm: RM_PENALTY,
         challengeStartDateIso: null,
         currentWeight: null,
@@ -950,6 +1030,12 @@ export async function getAdminPayload() {
     }
 
     const tracking = buildTrackingState(user);
+    const currentMonthlyLossTargetKg = getMonthlyLossTargetKgForPeriod(
+      user.id,
+      tracking.monthlyLossTargetKg,
+      userMonthlyTargetMap,
+      currentMonth,
+    );
 
     return {
       id: user.id,
@@ -965,7 +1051,9 @@ export async function getAdminPayload() {
       startWeight: user.isPrivate ? null : user.startWeight,
       targetWeight: user.isPrivate ? null : tracking.targetWeight,
       targetLossKg: tracking.targetLossKg,
-      monthlyLossTargetKg: tracking.monthlyLossTargetKg,
+      monthlyLossTargetKg: currentMonthlyLossTargetKg,
+      baseMonthlyLossTargetKg: tracking.monthlyLossTargetKg,
+      monthlyTargetChanges: userMonthlyTargetsByUser.get(user.id) ?? [],
       monthlyPenaltyRm: tracking.monthlyPenaltyRm,
       challengeStartDateIso: tracking.challengeStartDate.toISOString(),
       currentWeight: user.isPrivate ? null : tracking.currentWeight,

@@ -21,6 +21,7 @@ import {
   createPrivateProgressEntryAction,
   createWeightEntryAction,
   deleteMonthPolicyAction,
+  deleteMonthlyLossTargetChangeAction,
   deleteUserMonthPolicyAction,
   upsertMonthPolicyAction,
   upsertUserMonthPolicyAction,
@@ -594,6 +595,19 @@ function EntryEditor({
   );
 }
 
+function getScheduledMonthlyTarget(user: AdminUserSummary, year: number, month: number) {
+  if (!Number.isInteger(year) || !Number.isInteger(month)) {
+    return user.monthlyLossTargetKg;
+  }
+
+  const periodIndex = year * 12 + month;
+  const effectiveChange = [...user.monthlyTargetChanges]
+    .sort((left, right) => right.year - left.year || right.month - left.month)
+    .find((change) => change.year * 12 + change.month <= periodIndex);
+
+  return effectiveChange?.monthlyLossTargetKg ?? user.baseMonthlyLossTargetKg;
+}
+
 function PersonalMonthTargets({
   monthPolicies,
   user,
@@ -610,16 +624,17 @@ function PersonalMonthTargets({
     `${initialPolicy?.requiredTargetPct ?? 75}`,
   );
   const [selectedYear, selectedMonthNumber] = selectedMonth.split("-").map(Number);
+  const selectedBaseTargetKg = getScheduledMonthlyTarget(user, selectedYear, selectedMonthNumber);
   const selectedGroupPolicy = monthPolicies.find(
     (policy) => policy.year === selectedYear && policy.month === selectedMonthNumber,
   );
   const parsedTargetPct = Number(requiredTargetPct);
   const hasValidPreview = Number.isFinite(parsedTargetPct) && parsedTargetPct >= 1 && parsedTargetPct <= 200;
   const previewRequiredLossKg = hasValidPreview
-    ? (user.monthlyLossTargetKg * parsedTargetPct) / 100
+    ? (selectedBaseTargetKg * parsedTargetPct) / 100
     : null;
   const fallbackTargetPct = selectedGroupPolicy?.requiredTargetPct ?? 100;
-  const fallbackRequiredLossKg = (user.monthlyLossTargetKg * fallbackTargetPct) / 100;
+  const fallbackRequiredLossKg = (selectedBaseTargetKg * fallbackTargetPct) / 100;
   const selectedMonthLabel = selectedYear && selectedMonthNumber
     ? getMonthLabel(selectedMonthNumber, selectedYear)
     : "the selected month";
@@ -685,7 +700,7 @@ function PersonalMonthTargets({
           <p>
             {parsedTargetPct}% requires{" "}
             <span className="font-semibold text-ink">{formatWeight(previewRequiredLossKg)}</span> instead of{" "}
-            {formatWeight(user.monthlyLossTargetKg)} in {selectedMonthLabel}.
+            {formatWeight(selectedBaseTargetKg)} in {selectedMonthLabel}.
             {selectedGroupPolicy ? ` This replaces the ${selectedGroupPolicy.requiredTargetPct}% group rule.` : ""}
           </p>
         ) : (
@@ -701,7 +716,8 @@ function PersonalMonthTargets({
             const groupPolicy = monthPolicies.find(
               (candidate) => candidate.year === policy.year && candidate.month === policy.month,
             );
-            const requiredLossKg = (user.monthlyLossTargetKg * policy.requiredTargetPct) / 100;
+            const baseTargetKg = getScheduledMonthlyTarget(user, policy.year, policy.month);
+            const requiredLossKg = (baseTargetKg * policy.requiredTargetPct) / 100;
 
             return (
               <div
@@ -1081,7 +1097,7 @@ function ParticipantEditor({
             >
               <div className="grid gap-4 sm:grid-cols-2">
                 <SettingBlock label="Monthly target (kg)">
-                  <form action={updateMonthlyLossTargetAction} className="flex flex-col gap-2 sm:flex-row">
+                  <form action={updateMonthlyLossTargetAction} className="grid gap-2">
                     <input name="userId" type="hidden" value={user.id} />
                     <input
                       aria-label="Monthly loss target in kilograms"
@@ -1093,10 +1109,24 @@ function ParticipantEditor({
                       step="0.01"
                       type="number"
                     />
-                    <button className="secondary-button min-h-11 w-full px-4 py-2 sm:w-auto" type="submit">
-                      Save target
+                    <label className="space-y-1 text-xs font-medium text-ink/70">
+                      <span>Effective from</span>
+                      <input
+                        aria-label="Target effective month"
+                        className="field min-w-0"
+                        defaultValue={currentMonthInputValue()}
+                        name="effectiveMonth"
+                        required
+                        type="month"
+                      />
+                    </label>
+                    <button className="secondary-button min-h-11 w-full px-4 py-2" type="submit">
+                      Save target change
                     </button>
                   </form>
+                  <p className="mt-2 text-xs leading-5 text-ink/60">
+                    Earlier months keep the target that applied at the time.
+                  </p>
                 </SettingBlock>
 
                 <SettingBlock label="Penalty / month (RM)">
@@ -1118,6 +1148,38 @@ function ParticipantEditor({
                   </form>
                 </SettingBlock>
               </div>
+
+              {user.monthlyTargetChanges.length > 0 ? (
+                <div className="mt-4 rounded-2xl border border-black/5 bg-white/65 p-4">
+                  <p className="text-sm font-semibold text-ink">Target history</p>
+                  <p className="mt-1 text-xs leading-5 text-ink/60">
+                    The original {formatWeight(user.baseMonthlyLossTargetKg)} target applies before the first change.
+                  </p>
+                  <div className="mt-3 space-y-2">
+                    {user.monthlyTargetChanges.map((change) => (
+                      <div
+                        className="flex items-center justify-between gap-3 rounded-xl bg-sand/45 px-3 py-2"
+                        key={change.id}
+                      >
+                        <div>
+                          <p className="text-sm font-semibold text-ink">{formatWeight(change.monthlyLossTargetKg)} / month</p>
+                          <p className="text-xs text-ink/60">From {getMonthLabel(change.month, change.year)}</p>
+                        </div>
+                        <form action={deleteMonthlyLossTargetChangeAction}>
+                          <input name="targetChangeId" type="hidden" value={change.id} />
+                          <button
+                            aria-label={`Remove target change from ${getMonthLabel(change.month, change.year)}`}
+                            className="secondary-button min-h-11 px-3 py-2"
+                            type="submit"
+                          >
+                            Remove
+                          </button>
+                        </form>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
 
               <div className="mt-4">
                 <SettingBlock label="Challenge start">

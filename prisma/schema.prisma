@@ -8,28 +8,29 @@ datasource db {
 }
 
 model User {
-  id                    String            @id @default(cuid())
+  id                    String              @id @default(cuid())
   name                  String
-  email                 String?           @unique
+  email                 String?             @unique
   passwordHash          String?
-  claimCode             String?           @unique
-  isPrivate             Boolean           @default(false)
+  claimCode             String?             @unique
+  isPrivate             Boolean             @default(false)
   heightCm              Float?
   startWeight           Float?
   targetWeight          Float?
   targetLossKg          Float?
-  monthlyLossTargetKg   Float             @default(2)
-  monthlyPenaltyRm      Int               @default(30)
+  monthlyLossTargetKg   Float               @default(2)
+  monthlyPenaltyRm      Int                 @default(30)
   challengeStartDate    DateTime?
-  goalReached           Boolean           @default(false)
-  isAdmin               Boolean           @default(false)
-  isParticipant         Boolean           @default(true)
-  totalRmOwed           Int               @default(0)
-  avatarUrl              String?
-  createdAt             DateTime          @default(now())
+  goalReached           Boolean             @default(false)
+  isAdmin               Boolean             @default(false)
+  isParticipant         Boolean             @default(true)
+  totalRmOwed           Int                 @default(0)
+  avatarUrl             String?
+  createdAt             DateTime            @default(now())
   weightEntries         WeightEntry[]
   monthlyResults        MonthlyResult[]
   personalMonthPolicies UserMonthPolicy[]
+  monthlyTargetChanges  UserMonthlyTarget[]
 }
 
 model MonthPolicy {
@@ -56,6 +57,20 @@ model UserMonthPolicy {
   @@unique([userId, month, year], name: "userId_month_year")
   @@index([year, month])
   @@index([userId])
+}
+
+model UserMonthlyTarget {
+  id                  String   @id @default(cuid())
+  userId              String
+  month               Int
+  year                Int
+  monthlyLossTargetKg Float
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, month, year], name: "userId_month_year")
+  @@index([userId, year, month])
 }
 
 model WeightEntry {

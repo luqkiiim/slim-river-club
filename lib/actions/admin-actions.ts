@@ -498,8 +498,10 @@ export async function updateMonthlyLossTargetAction(formData: FormData) {
 
   const userId = `${formData.get("userId") ?? ""}`;
   const monthlyLossTargetKg = Number(formData.get("monthlyLossTargetKg"));
+  const effectiveMonthValue = `${formData.get("effectiveMonth") ?? ""}`;
+  const effectivePeriod = parseValidMonthInput(effectiveMonthValue);
 
-  if (!userId || !Number.isFinite(monthlyLossTargetKg) || monthlyLossTargetKg <= 0) {
+  if (!userId || !effectivePeriod || !Number.isFinite(monthlyLossTargetKg) || monthlyLossTargetKg <= 0) {
     return;
   }
 
@@ -515,9 +517,21 @@ export async function updateMonthlyLossTargetAction(formData: FormData) {
   }
 
   await prisma.$transaction(async (tx) => {
-    await tx.user.update({
-      where: { id: userId },
-      data: {
+    await tx.userMonthlyTarget.upsert({
+      where: {
+        userId_month_year: {
+          userId,
+          month: effectivePeriod.month,
+          year: effectivePeriod.year,
+        },
+      },
+      update: {
+        monthlyLossTargetKg: normalizeLoss(monthlyLossTargetKg),
+      },
+      create: {
+        userId,
+        month: effectivePeriod.month,
+        year: effectivePeriod.year,
         monthlyLossTargetKg: normalizeLoss(monthlyLossTargetKg),
       },
     });
@@ -526,6 +540,34 @@ export async function updateMonthlyLossTargetAction(formData: FormData) {
   });
 
   refreshAdminViews(userId);
+}
+
+export async function deleteMonthlyLossTargetChangeAction(formData: FormData) {
+  await requireAdminSession();
+
+  const targetChangeId = `${formData.get("targetChangeId") ?? ""}`;
+
+  if (!targetChangeId) {
+    return;
+  }
+
+  const targetChange = await prisma.userMonthlyTarget.findUnique({
+    where: { id: targetChangeId },
+    select: { userId: true },
+  });
+
+  if (!targetChange) {
+    return;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.userMonthlyTarget.delete({
+      where: { id: targetChangeId },
+    });
+    await syncUserMonthlyResults(targetChange.userId, tx);
+  });
+
+  refreshAdminViews(targetChange.userId);
 }
 
 export async function updateMonthlyPenaltyAction(formData: FormData) {

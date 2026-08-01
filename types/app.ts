@@ -26,6 +26,14 @@ export interface UserMonthPolicySummary {
   requiredTargetPct: number;
 }
 
+export interface UserMonthlyTargetSummary {
+  id: string;
+  userId: string;
+  month: number;
+  year: number;
+  monthlyLossTargetKg: number;
+}
+
 export interface DashboardUserSummary {
   id: string;
   name: string;
@@ -134,6 +142,8 @@ export interface AdminUserSummary {
   targetWeight: number | null;
   targetLossKg: number | null;
   monthlyLossTargetKg: number;
+  baseMonthlyLossTargetKg: number;
+  monthlyTargetChanges: UserMonthlyTargetSummary[];
   monthlyPenaltyRm: number;
   challengeStartDateIso: string | null;
   currentWeight: number | null;
