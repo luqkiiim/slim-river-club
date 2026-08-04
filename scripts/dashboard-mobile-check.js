@@ -722,7 +722,8 @@ async function seedDatabase() {
   const publicStart = createUtcDateDaysAgo(35);
   const publicRecent = createUtcDateDaysAgo(2);
   const privateStart = createUtcDateDaysAgo(42);
-  const privateRecent = createUtcDateDaysAgo(3);
+  // Keep this outside every possible Saturday-Friday check-in window.
+  const privateRecent = createUtcDateDaysAgo(7);
 
   const publicUser = await prisma.user.create({
     data: {
@@ -915,6 +916,82 @@ async function main() {
     ) {
       throw new Error(`Participant list state ${JSON.stringify(participantListAudit)}`);
     }
+
+    await clickByRoleAndName(client, sessionId, "button", "Overall");
+    const overallProgressAudit = await waitFor(
+      async () => {
+        const state = await evaluate(
+          client,
+          `(() => {
+            const normalize = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+            const section = document.querySelector('#participants');
+            const buttons = section ? [...section.querySelectorAll('button')] : [];
+            const cardText = section
+              ? [...section.querySelectorAll('article')].map((card) => normalize(card.textContent))
+              : [];
+            const pressed = Object.fromEntries(
+              buttons.map((button) => [normalize(button.textContent), button.getAttribute('aria-pressed')]),
+            );
+
+            return {
+              heading: normalize(section?.querySelector('h2')?.textContent),
+              pressed,
+              hasPublicOverallValue: cardText.some(
+                (text) => text.includes(${JSON.stringify(seeded.publicName)}) && text.includes('1.7 kg / 10 kg'),
+              ),
+              hasPrivateOverallValue: cardText.some(
+                (text) => text.includes(${JSON.stringify(seeded.privateName)}) && text.includes('1.75 kg / 6 kg'),
+              ),
+              hasThirdOverallValue: cardText.some(
+                (text) => text.includes(${JSON.stringify(seeded.thirdName)}) && text.includes('0 kg / 6 kg'),
+              ),
+            };
+          })()`,
+          sessionId,
+        );
+
+        if (
+          state.heading === "Overall progress" &&
+          state.pressed?.Overall === "true" &&
+          state.pressed?.["This month"] === "false" &&
+          state.hasPublicOverallValue &&
+          state.hasPrivateOverallValue &&
+          state.hasThirdOverallValue
+        ) {
+          return state;
+        }
+
+        throw new Error(`Overall progress state ${JSON.stringify(state)}`);
+      },
+      10000,
+      "overall participant progress",
+    );
+
+    await clickByRoleAndName(client, sessionId, "button", "This month");
+    await waitFor(
+      async () => {
+        const state = await evaluate(
+          client,
+          `(() => {
+            const normalize = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+            const section = document.querySelector('#participants');
+            const thisMonthButton = section
+              ? [...section.querySelectorAll('button')].find((button) => normalize(button.textContent) === 'This month')
+              : null;
+            return {
+              heading: normalize(section?.querySelector('h2')?.textContent),
+              pressed: thisMonthButton?.getAttribute('aria-pressed') || null,
+            };
+          })()`,
+          sessionId,
+        );
+
+        if (state.heading === "The club this month" && state.pressed === "true") return state;
+        throw new Error(`Monthly progress state ${JSON.stringify(state)}`);
+      },
+      10000,
+      "monthly participant progress restore",
+    );
 
     await clickByRoleAndName(client, sessionId, "button", "Log weight");
     const dialogAudit = await waitFor(
@@ -1149,7 +1226,10 @@ async function main() {
     const result = {
       status: "passed",
       dashboard: dashboardAudit,
-      participantList: participantListAudit,
+      participantList: {
+        ...participantListAudit,
+        overallProgress: overallProgressAudit,
+      },
       weightDialog: dialogAudit,
       profile: {
         avatarControl: {

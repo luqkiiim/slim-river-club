@@ -3,16 +3,14 @@ import {
   CaretRight,
   CheckCircle,
   Info,
-  Target,
-  TrendUp,
 } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
 
 import { AppHeader, MobileBottomNav } from "@/components/app-chrome";
 import { CompletionRing } from "@/components/completion-ring";
 import { LogWeightModal } from "@/components/log-weight-modal";
+import { ParticipantProgress, type ParticipantProgressUser } from "@/components/participant-progress";
 import { ProgressBar } from "@/components/progress-bar";
-import { UserCard } from "@/components/user-card";
 import { getDashboardPayload } from "@/lib/data";
 import { requireSession } from "@/lib/session";
 import { formatPercentage, formatWeight, getCurrentAppDateAtNoon } from "@/lib/weight-utils";
@@ -214,6 +212,19 @@ export default async function DashboardPage() {
   const session = await requireSession();
   const { users, groupSummary, currentMonthLabel } = await getDashboardPayload(session.user.id);
   const currentUser = users.find((user) => user.id === session.user.id);
+  const participantProgressUsers: ParticipantProgressUser[] = users.map((user) => ({
+    avatarUrl: user.avatarUrl,
+    currentMonthLoss: user.currentMonthLoss,
+    currentMonthRequiredLossKg: user.currentMonthRequiredLossKg,
+    goalReached: user.goalReached,
+    id: user.id,
+    kgLost: user.kgLost,
+    monthlyStatus: user.monthlyStatus,
+    name: user.name,
+    progressPct: user.progressPct,
+    targetLossKg: user.targetLossKg,
+    weeklyCheckInPending: user.weeklyCheckInPending,
+  }));
   const currentUserNeedsSetup = Boolean(currentUser?.isPrivate && currentUser.needsStartingWeight);
   const canLogWeight = session.user.isParticipant && !currentUserNeedsSetup;
 
@@ -243,50 +254,12 @@ export default async function DashboardPage() {
 
         <GroupMomentum currentMonthLabel={currentMonthLabel} group={groupSummary} />
 
-        <section className="scroll-mt-5 rounded-[24px] bg-cream/80 px-4 py-4 sm:px-6 sm:py-5" id="participants" aria-labelledby="participants-title">
-          <div className="flex items-end justify-between gap-4">
-            <div>
-              <p className="eyebrow">Participant activity</p>
-              <h2 className="mt-1 text-xl font-semibold sm:mt-2 sm:text-2xl" id="participants-title">
-                The club this month
-              </h2>
-            </div>
-            <div className="flex flex-col items-end gap-1">
-              {users.some((user) => user.weeklyCheckInPending) ? (
-                <span className="flex items-center gap-1.5 text-xs font-medium text-ink/70">
-                  <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-[#C94735]" />
-                  Check-in due
-                </span>
-              ) : null}
-              <span className="hidden items-center gap-1 text-sm font-medium text-moss sm:flex">
-                <TrendUp aria-hidden size={18} weight="bold" />
-                {groupSummary.activeLoggersThisMonth} active
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-3">
-            {users.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-black/15 px-5 py-10 text-center">
-                <Target aria-hidden className="mx-auto text-ink/35" size={30} weight="duotone" />
-                <p className="mt-3 font-semibold">No participant profiles yet</p>
-                <p className="mt-1 text-sm text-ink/70">
-                  {session.user.isAdmin ? "Open Admin to create the first participant." : "Your admin has not added anyone yet."}
-                </p>
-              </div>
-            ) : (
-              /* This club is small enough to keep every participant immediately scannable. */
-              users.map((user) => (
-                <UserCard
-                  key={user.id}
-                  currentMonthLabel={currentMonthLabel}
-                  isCurrentUser={user.id === session.user.id}
-                  user={user}
-                />
-              ))
-            )}
-          </div>
-        </section>
+        <ParticipantProgress
+          activeLoggersThisMonth={groupSummary.activeLoggersThisMonth}
+          currentMonthLabel={currentMonthLabel}
+          emptyStateMessage={session.user.isAdmin ? "Open Admin to create the first participant." : "Your admin has not added anyone yet."}
+          users={participantProgressUsers}
+        />
 
         {currentUser?.goalReached ? (
           <p className="mt-6 flex items-center justify-center gap-2 text-sm font-medium text-moss">
