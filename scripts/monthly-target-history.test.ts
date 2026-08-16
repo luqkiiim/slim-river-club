@@ -5,7 +5,7 @@ import {
   buildUserMonthlyTargetMap,
   getMonthlyLossTargetKgForPeriod,
 } from "../lib/monthly-targets";
-import { getRequiredLossKg } from "../lib/weight-utils";
+import { getRemainingMonthlyLossKg, getRequiredLossKg } from "../lib/weight-utils";
 
 const userId = "participant-1";
 
@@ -39,4 +39,10 @@ test("historical penalties retain the old target while percentages use each mont
   assert.equal(getRequiredLossKg(julyBase, 100), 2);
   assert.equal(1.4 < getRequiredLossKg(julyBase, 100), true);
   assert.equal(getRequiredLossKg(augustBase, 75), 0.75);
+});
+
+test("monthly loss remaining includes weight gained during the month", () => {
+  assert.equal(getRemainingMonthlyLossKg(-1, 2), 3);
+  assert.equal(getRemainingMonthlyLossKg(0.5, 2), 1.5);
+  assert.equal(getRemainingMonthlyLossKg(2.5, 2), 0);
 });

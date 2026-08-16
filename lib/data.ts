@@ -27,6 +27,7 @@ import {
   getLatestTotalKgLost,
   getMonthLabel,
   getMonthlyStatus,
+  getRemainingMonthlyLossKg,
   getRequiredLossKg,
   getTotalKgLostBefore,
   getTotalKgLostOnOrBefore,
@@ -179,8 +180,7 @@ function buildCurrentMonthPace({
   currentMonthPaceStatus: MonthlyPaceStatus;
   currentMonthPaceMessage: string;
 } {
-  const safeCurrentMonthLoss = Math.max(currentMonthLoss, 0);
-  const currentMonthRemainingLossKg = roundTo(Math.max(currentMonthRequiredLossKg - safeCurrentMonthLoss, 0), 2);
+  const currentMonthRemainingLossKg = getRemainingMonthlyLossKg(currentMonthLoss, currentMonthRequiredLossKg);
   const daysInPeriod = getDaysInPeriod(currentMonth);
   const elapsedDays = getElapsedDaysInPeriod(currentMonth);
   const remainingDays = Math.max(daysInPeriod - elapsedDays + 1, 1);
@@ -223,7 +223,7 @@ function buildCurrentMonthPace({
   }
 
   const expectedLossByNow = roundTo(currentMonthRequiredLossKg * (elapsedDays / daysInPeriod), 2);
-  const paceGap = roundTo(expectedLossByNow - safeCurrentMonthLoss, 2);
+  const paceGap = roundTo(expectedLossByNow - currentMonthLoss, 2);
   const currentMonthPaceStatus: MonthlyPaceStatus =
     paceGap <= 0.1 ? "ON_TRACK" : paceGap <= 0.5 ? "SLIGHTLY_BEHIND" : "BEHIND";
   const remainingDaysLabel = remainingDays === 1 ? "day" : "days";

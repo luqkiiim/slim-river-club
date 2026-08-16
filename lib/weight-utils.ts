@@ -238,6 +238,10 @@ export function getRequiredLossKg(monthlyLossTargetKg: number, targetRatioPct = 
   return normalizeLoss((monthlyLossTargetKg * targetRatioPct) / 100);
 }
 
+export function getRemainingMonthlyLossKg(currentMonthLoss: number, requiredLossKg: number) {
+  return roundTo(Math.max(requiredLossKg - currentMonthLoss, 0), 2);
+}
+
 export function calculateBmi(weightKg: number, heightCm: number) {
   if (weightKg <= 0 || heightCm <= 0) {
     return null;
