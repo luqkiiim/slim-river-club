@@ -112,7 +112,7 @@ function StatStrip({ items }: { items: InfoCardContent[] }) {
     <dl className={`grid ${isFourColumn ? "grid-cols-4" : "grid-cols-3"} divide-x divide-black/[0.1] border-t border-black/[0.1] pt-5`}>
       {items.map((item) => (
         <div className={`min-w-0 first:pl-0 last:pr-0 sm:px-5 ${isFourColumn ? "px-1.5" : "px-3"}`} key={item.label}>
-          <dt className={`${isFourColumn ? "text-[10px]" : "text-[11px]"} font-semibold uppercase tracking-[0.12em] text-ink/70 sm:text-xs`}>{item.label}</dt>
+          <dt className={`${isFourColumn ? "min-h-[30px] text-[10px] sm:min-h-0" : "text-[11px]"} font-semibold uppercase tracking-[0.12em] text-ink/70 sm:text-xs`}>{item.label}</dt>
           <dd className={`mt-2 break-words font-semibold text-ink sm:text-2xl ${isFourColumn ? "text-base" : "text-lg"}`}>{item.value}</dd>
         </div>
       ))}
