@@ -84,7 +84,7 @@ function ParticipantProgressRow({
           <span
             className={`mt-1 min-w-0 overflow-hidden text-[13px] font-medium text-ink/70 sm:text-sm ${
               isMonthlyView && weightProgressValue
-                ? "grid grid-cols-[minmax(0,0.9fr)_1px_minmax(0,1.1fr)] items-center gap-x-2"
+                ? "grid grid-cols-[72px_1px_minmax(0,1fr)] items-center gap-x-2"
                 : "block truncate"
             }`}
           >
