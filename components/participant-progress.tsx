@@ -24,7 +24,6 @@ export interface ParticipantProgressUser {
   name: string;
   progressPct: number;
   targetLossKg: number | null;
-  targetWeight: number | null;
   weeklyCheckInPending: boolean;
 }
 
@@ -65,13 +64,14 @@ function ParticipantProgressRow({
     ? user.monthlyStatus === "EXEMPT"
       ? "Exempt"
       : `${formatWeight(user.currentMonthLoss).replace(" kg", "")} / ${formatWeight(user.currentMonthRequiredLossKg)}`
-    : hasOverallGoal
-      ? `${formatWeight(user.kgLost).replace(" kg", "")} / ${formatWeight(targetLossKg)}`
-      : `${formatWeight(user.kgLost)} lost overall`;
-  const weightTarget = isMonthlyView ? user.currentMonthTargetWeight : user.targetWeight;
+    : user.goalReached
+      ? `Goal reached · ${formatWeight(user.kgLost)} lost`
+      : hasOverallGoal
+        ? `${formatWeight(user.kgLost).replace(" kg", "")} / ${formatWeight(targetLossKg)}`
+        : `${formatWeight(user.kgLost)} lost overall`;
   const weightProgressValue =
-    user.currentWeight !== null && weightTarget !== null
-      ? `${formatCompactWeightValue(user.currentWeight)} / ${formatCompactWeightValue(weightTarget)} kg`
+    isMonthlyView && user.currentWeight !== null && user.currentMonthTargetWeight !== null
+      ? `${formatCompactWeightValue(user.currentWeight)} / ${formatCompactWeightValue(user.currentMonthTargetWeight)} kg`
       : null;
 
   return (
@@ -100,9 +100,7 @@ function ParticipantProgressRow({
               <>
                 <span aria-hidden className="h-4 w-px shrink-0 bg-black/15" />
                 <span className="min-w-0 truncate whitespace-nowrap tabular-nums">
-                  <span className="sr-only">
-                    {isMonthlyView ? "Current and month-end target weight: " : "Current and overall target weight: "}
-                  </span>
+                  <span className="sr-only">Current and month-end target weight: </span>
                   {weightProgressValue}
                 </span>
               </>

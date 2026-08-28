@@ -225,7 +225,6 @@ export default async function DashboardPage() {
     name: user.name,
     progressPct: user.progressPct,
     targetLossKg: user.targetLossKg,
-    targetWeight: user.targetWeight,
     weeklyCheckInPending: user.weeklyCheckInPending,
   }));
   const currentUserNeedsSetup = Boolean(currentUser?.isPrivate && currentUser.needsStartingWeight);
