@@ -1,6 +1,6 @@
 "use client";
 
-import { CaretRight, Target, TrendUp } from "@phosphor-icons/react";
+import { Target, TrendUp } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -72,7 +72,7 @@ function ParticipantProgressRow({
 
   return (
     <article className="border-b border-black/[0.08] last:border-b-0">
-      <Link className="group flex min-h-[76px] items-center gap-3 py-3.5" href={`/users/${user.id}`}>
+      <Link className="flex min-h-[76px] items-center gap-3 py-3.5" href={`/users/${user.id}`}>
         <ParticipantAvatar
           avatarUrl={user.avatarUrl}
           name={user.name}
@@ -125,7 +125,6 @@ function ParticipantProgressRow({
             }
           />
         )}
-        <CaretRight aria-hidden className="shrink-0 text-ink/70 transition group-hover:translate-x-0.5 group-hover:text-moss" size={20} />
       </Link>
     </article>
   );
