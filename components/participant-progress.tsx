@@ -42,6 +42,10 @@ function getMonthlyProgress(user: ParticipantProgressUser) {
   return Math.max((user.currentMonthLoss / user.currentMonthRequiredLossKg) * 100, 0);
 }
 
+function formatCompactWeightValue(value: number) {
+  return value.toFixed(1);
+}
+
 function ParticipantProgressRow({
   currentMonthLabel,
   user,
@@ -67,7 +71,7 @@ function ParticipantProgressRow({
         : `${formatWeight(user.kgLost)} lost overall`;
   const weightProgressValue =
     user.currentWeight !== null && user.currentMonthTargetWeight !== null
-      ? `${formatWeight(user.currentWeight).replace(" kg", "")} / ${formatWeight(user.currentMonthTargetWeight)}`
+      ? `${formatCompactWeightValue(user.currentWeight)} / ${formatCompactWeightValue(user.currentMonthTargetWeight)} kg`
       : null;
 
   return (
