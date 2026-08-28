@@ -106,12 +106,14 @@ function getMonthProgress(user: DashboardUserSummary) {
 }
 
 function StatStrip({ items }: { items: InfoCardContent[] }) {
+  const isFourColumn = items.length === 4;
+
   return (
-    <dl className="grid grid-cols-3 divide-x divide-black/[0.1] border-t border-black/[0.1] pt-5">
+    <dl className={`grid ${isFourColumn ? "grid-cols-4" : "grid-cols-3"} divide-x divide-black/[0.1] border-t border-black/[0.1] pt-5`}>
       {items.map((item) => (
-        <div className="min-w-0 px-3 first:pl-0 last:pr-0 sm:px-5" key={item.label}>
-          <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink/70 sm:text-xs">{item.label}</dt>
-          <dd className="mt-2 break-words text-lg font-semibold text-ink sm:text-2xl">{item.value}</dd>
+        <div className={`min-w-0 first:pl-0 last:pr-0 sm:px-5 ${isFourColumn ? "px-1.5" : "px-3"}`} key={item.label}>
+          <dt className={`${isFourColumn ? "text-[10px]" : "text-[11px]"} font-semibold uppercase tracking-[0.12em] text-ink/70 sm:text-xs`}>{item.label}</dt>
+          <dd className={`mt-2 break-words font-semibold text-ink sm:text-2xl ${isFourColumn ? "text-base" : "text-lg"}`}>{item.value}</dd>
         </div>
       ))}
     </dl>
@@ -339,20 +341,19 @@ export default async function UserProfilePage({
             },
             { label: "Target", value: formatWeight(payload.user.currentMonthRequiredLossKg) },
             { label: "Left", value: formatWeight(payload.user.currentMonthRemainingLossKg) },
+            ...(payload.displayMode === "weight"
+              ? [
+                  {
+                    label: "Target weight",
+                    value:
+                      payload.user.currentMonthTargetWeight !== null
+                        ? formatWeight(payload.user.currentMonthTargetWeight)
+                        : "Not available",
+                  },
+                ]
+              : []),
           ]}
         />
-        {payload.displayMode === "weight" ? (
-          <dl className="mt-5 border-t border-black/[0.1] pt-4">
-            <div className="flex items-baseline justify-between gap-4">
-              <dt className="text-sm font-medium text-ink/70">Month-end target weight</dt>
-              <dd className="shrink-0 text-lg font-semibold text-ink">
-                {payload.user.currentMonthTargetWeight !== null
-                  ? formatWeight(payload.user.currentMonthTargetWeight)
-                  : "Not available"}
-              </dd>
-            </div>
-          </dl>
-        ) : null}
       </section>
 
       <WeightChart
