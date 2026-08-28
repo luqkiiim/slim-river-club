@@ -341,6 +341,18 @@ export default async function UserProfilePage({
             { label: "Left", value: formatWeight(payload.user.currentMonthRemainingLossKg) },
           ]}
         />
+        {payload.displayMode === "weight" ? (
+          <dl className="mt-5 border-t border-black/[0.1] pt-4">
+            <div className="flex items-baseline justify-between gap-4">
+              <dt className="text-sm font-medium text-ink/70">Month-end target weight</dt>
+              <dd className="shrink-0 text-lg font-semibold text-ink">
+                {payload.user.currentMonthTargetWeight !== null
+                  ? formatWeight(payload.user.currentMonthTargetWeight)
+                  : "Not available"}
+              </dd>
+            </div>
+          </dl>
+        ) : null}
       </section>
 
       <WeightChart
