@@ -24,6 +24,7 @@ export interface ParticipantProgressUser {
   name: string;
   progressPct: number;
   targetLossKg: number | null;
+  targetWeight: number | null;
   weeklyCheckInPending: boolean;
 }
 
@@ -64,14 +65,13 @@ function ParticipantProgressRow({
     ? user.monthlyStatus === "EXEMPT"
       ? "Exempt"
       : `${formatWeight(user.currentMonthLoss).replace(" kg", "")} / ${formatWeight(user.currentMonthRequiredLossKg)}`
-    : user.goalReached
-      ? `Goal reached · ${formatWeight(user.kgLost)} lost`
-      : hasOverallGoal
-        ? `${formatWeight(user.kgLost)} / ${formatWeight(targetLossKg)}`
-        : `${formatWeight(user.kgLost)} lost overall`;
+    : hasOverallGoal
+      ? `${formatWeight(user.kgLost).replace(" kg", "")} / ${formatWeight(targetLossKg)}`
+      : `${formatWeight(user.kgLost)} lost overall`;
+  const weightTarget = isMonthlyView ? user.currentMonthTargetWeight : user.targetWeight;
   const weightProgressValue =
-    user.currentWeight !== null && user.currentMonthTargetWeight !== null
-      ? `${formatCompactWeightValue(user.currentWeight)} / ${formatCompactWeightValue(user.currentMonthTargetWeight)} kg`
+    user.currentWeight !== null && weightTarget !== null
+      ? `${formatCompactWeightValue(user.currentWeight)} / ${formatCompactWeightValue(weightTarget)} kg`
       : null;
 
   return (
@@ -87,7 +87,7 @@ function ParticipantProgressRow({
           <span className="block truncate text-base font-semibold text-ink">{user.name}</span>
           <span
             className={`mt-1 min-w-0 overflow-hidden text-[13px] font-medium text-ink/70 sm:text-sm ${
-              isMonthlyView && weightProgressValue
+              weightProgressValue
                 ? "grid grid-cols-[72px_1px_minmax(0,1fr)] items-center gap-x-2"
                 : "block truncate"
             }`}
@@ -96,11 +96,13 @@ function ParticipantProgressRow({
               <span className="sr-only">{isMonthlyView ? "Monthly loss: " : "Overall progress: "}</span>
               {progressValue}
             </span>
-            {isMonthlyView && weightProgressValue ? (
+            {weightProgressValue ? (
               <>
                 <span aria-hidden className="h-4 w-px shrink-0 bg-black/15" />
                 <span className="min-w-0 truncate whitespace-nowrap tabular-nums">
-                  <span className="sr-only">Current and month-end target weight: </span>
+                  <span className="sr-only">
+                    {isMonthlyView ? "Current and month-end target weight: " : "Current and overall target weight: "}
+                  </span>
                   {weightProgressValue}
                 </span>
               </>
