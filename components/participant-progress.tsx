@@ -15,6 +15,7 @@ export interface ParticipantProgressUser {
   avatarUrl: string | null;
   currentMonthLoss: number;
   currentMonthRequiredLossKg: number;
+  currentMonthTargetWeight: number | null;
   currentWeight: number | null;
   goalReached: boolean;
   id: string;
@@ -23,7 +24,6 @@ export interface ParticipantProgressUser {
   name: string;
   progressPct: number;
   targetLossKg: number | null;
-  targetWeight: number | null;
   weeklyCheckInPending: boolean;
 }
 
@@ -66,8 +66,8 @@ function ParticipantProgressRow({
         ? `${formatWeight(user.kgLost)} / ${formatWeight(targetLossKg)}`
         : `${formatWeight(user.kgLost)} lost overall`;
   const weightProgressValue =
-    user.currentWeight !== null && user.targetWeight !== null
-      ? `${formatWeight(user.currentWeight).replace(" kg", "")} / ${formatWeight(user.targetWeight)}`
+    user.currentWeight !== null && user.currentMonthTargetWeight !== null
+      ? `${formatWeight(user.currentWeight).replace(" kg", "")} / ${formatWeight(user.currentMonthTargetWeight)}`
       : null;
 
   return (
@@ -96,7 +96,7 @@ function ParticipantProgressRow({
               <>
                 <span aria-hidden className="h-4 w-px shrink-0 bg-black/15" />
                 <span className="min-w-0 truncate whitespace-nowrap tabular-nums">
-                  <span className="sr-only">Current and target weight: </span>
+                  <span className="sr-only">Current and month-end target weight: </span>
                   {weightProgressValue}
                 </span>
               </>
