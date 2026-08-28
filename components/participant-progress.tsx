@@ -15,6 +15,7 @@ export interface ParticipantProgressUser {
   avatarUrl: string | null;
   currentMonthLoss: number;
   currentMonthRequiredLossKg: number;
+  currentWeight: number | null;
   goalReached: boolean;
   id: string;
   kgLost: number;
@@ -22,6 +23,7 @@ export interface ParticipantProgressUser {
   name: string;
   progressPct: number;
   targetLossKg: number | null;
+  targetWeight: number | null;
   weeklyCheckInPending: boolean;
 }
 
@@ -63,6 +65,10 @@ function ParticipantProgressRow({
       : hasOverallGoal
         ? `${formatWeight(user.kgLost)} / ${formatWeight(targetLossKg)}`
         : `${formatWeight(user.kgLost)} lost overall`;
+  const weightProgressValue =
+    user.currentWeight !== null && user.targetWeight !== null
+      ? `${formatWeight(user.currentWeight).replace(" kg", "")} / ${formatWeight(user.targetWeight)}`
+      : null;
 
   return (
     <article className="border-b border-black/[0.08] last:border-b-0">
@@ -75,7 +81,21 @@ function ParticipantProgressRow({
 
         <span className="min-w-0 flex-1">
           <span className="block truncate text-base font-semibold text-ink">{user.name}</span>
-          <span className="mt-1 block truncate text-sm font-medium text-ink/70">{progressValue}</span>
+          <span className="mt-1 flex min-w-0 items-center gap-2 overflow-hidden text-[13px] font-medium text-ink/70 sm:text-sm">
+            <span className="shrink-0 whitespace-nowrap">
+              <span className="sr-only">{isMonthlyView ? "Monthly loss: " : "Overall progress: "}</span>
+              {progressValue}
+            </span>
+            {isMonthlyView && weightProgressValue ? (
+              <>
+                <span aria-hidden className="h-4 w-px shrink-0 bg-black/15" />
+                <span className="min-w-0 truncate whitespace-nowrap">
+                  <span className="sr-only">Current and target weight: </span>
+                  {weightProgressValue}
+                </span>
+              </>
+            ) : null}
+          </span>
         </span>
 
         {!isMonthlyView && !hasOverallGoal ? (
