@@ -81,15 +81,21 @@ function ParticipantProgressRow({
 
         <span className="min-w-0 flex-1">
           <span className="block truncate text-base font-semibold text-ink">{user.name}</span>
-          <span className="mt-1 flex min-w-0 items-center gap-2 overflow-hidden text-[13px] font-medium text-ink/70 sm:text-sm">
-            <span className="shrink-0 whitespace-nowrap">
+          <span
+            className={`mt-1 min-w-0 overflow-hidden text-[13px] font-medium text-ink/70 sm:text-sm ${
+              isMonthlyView && weightProgressValue
+                ? "grid grid-cols-[minmax(0,0.9fr)_1px_minmax(0,1.1fr)] items-center gap-x-2"
+                : "block truncate"
+            }`}
+          >
+            <span className="min-w-0 truncate whitespace-nowrap tabular-nums">
               <span className="sr-only">{isMonthlyView ? "Monthly loss: " : "Overall progress: "}</span>
               {progressValue}
             </span>
             {isMonthlyView && weightProgressValue ? (
               <>
                 <span aria-hidden className="h-4 w-px shrink-0 bg-black/15" />
-                <span className="min-w-0 truncate whitespace-nowrap">
+                <span className="min-w-0 truncate whitespace-nowrap tabular-nums">
                   <span className="sr-only">Current and target weight: </span>
                   {weightProgressValue}
                 </span>
